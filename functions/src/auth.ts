@@ -67,7 +67,6 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
         return
     }
 
-    logger.info(process.env)
     const decoded = jsonwebtoken.verify(reqJwt, process.env.JWT_SECRET as string, {
         ignoreExpiration: false,
     }) as LoginChallengeToken
@@ -84,6 +83,49 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
     const verifyResult = verifyMessage(signData, signature, IntentScope.PersonalMessage)
 
     if (!verifyResult) {
+        res.status(400).send('Invalid signature').end()
+        return
+    }
+
+    const provider = new JsonRpcProvider(mainnetConnection)
+    const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
+
+    const profiles = (await getAllOwnedObjects(provider, publicKey))
+        .filter(
+            (it) =>
+                dappPackages.some((dappPackage) => it.data?.type?.startsWith(dappPackage)) &&
+                it.data?.type?.endsWith('ProfileOwnerCap'),
+        )
+        .map((it) => it.data?.content?.dataType === 'moveObject' && it.data?.content.fields.profile)
+
+    const payload: TokenPayload = {
+        publicKey,
+        profiles,
+    }
+
+    const jwt = jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
+        expiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
+    })
+    res.status(200).json({ jwt, publicKey })
+}
+
+export const extendToken = async (req: Request, res: Response) => {
+    if (req.method !== 'POST') {
+        res.status(403).send('Forbidden').end()
+        return
+    }
+    const reqJwt = req.headers['authorization']
+
+    if (reqJwt == null) {
+        res.status(400).send('Missing authorization header').end()
+        return
+    }
+
+    const { publicKey } = jsonwebtoken.verify(reqJwt, process.env.JWT_SECRET as string, {
+        ignoreExpiration: false,
+    }) as TokenPayload
+
+    if (publicKey == null) {
         res.status(400).send('Invalid signature').end()
         return
     }

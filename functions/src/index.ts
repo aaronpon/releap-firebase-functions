@@ -1,5 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https'
-import { requestLoginChallenge, submitLoginChallenge } from './auth'
+import { extendToken, requestLoginChallenge, submitLoginChallenge } from './auth'
 import {
     applyJwtValidation,
     createPost,
@@ -17,6 +17,9 @@ export const entrypoint = onRequest({ secrets: ['JWT_SECRET', 'SEED_PHRASE'] }, 
             break
         case 'submitLoginChallenge':
             submitLoginChallenge(req, res)
+            break
+        case 'extendToken':
+            extendToken(req, res)
             break
         case 'createPost':
             applyJwtValidation(createPost)(req, res)
