@@ -87,25 +87,8 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
         return
     }
 
-    const provider = new JsonRpcProvider(mainnetConnection)
-    const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
+    const jwt = await genJWT(publicKey)
 
-    const profiles = (await getAllOwnedObjects(provider, publicKey))
-        .filter(
-            (it) =>
-                dappPackages.some((dappPackage) => it.data?.type?.startsWith(dappPackage)) &&
-                it.data?.type?.endsWith('ProfileOwnerCap'),
-        )
-        .map((it) => it.data?.content?.dataType === 'moveObject' && it.data?.content.fields.profile)
-
-    const payload: TokenPayload = {
-        publicKey,
-        profiles,
-    }
-
-    const jwt = jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
-        expiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
-    })
     res.status(200).json({ jwt, publicKey })
 }
 
@@ -130,6 +113,12 @@ export const extendToken = async (req: Request, res: Response) => {
         return
     }
 
+    const jwt = await genJWT(publicKey)
+
+    res.status(200).json({ jwt, publicKey })
+}
+
+async function genJWT(publicKey: string): Promise<string> {
     const provider = new JsonRpcProvider(mainnetConnection)
     const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
 
@@ -146,8 +135,7 @@ export const extendToken = async (req: Request, res: Response) => {
         profiles,
     }
 
-    const jwt = jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
+    return jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
         expiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
     })
-    res.status(200).json({ jwt, publicKey })
 }

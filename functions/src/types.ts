@@ -12,7 +12,7 @@ export interface TokenPayload {
 
 export interface AppContext {
     publicKey: string
-    profiles: string
+    profiles: string[]
     provider: JsonRpcProvider
     signer: RawSigner
     // env

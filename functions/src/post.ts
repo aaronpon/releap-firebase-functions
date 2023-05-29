@@ -34,7 +34,7 @@ export function applyJwtValidation(handler: (ctx: AppContext, req: Request, res:
                 return
             }
             publicKey = tokenPayload.publicKey
-            profiles = tokenPayload.publicKey
+            profiles = tokenPayload.profiles
         } catch (err) {
             res.status(400).send('Invaild JWT').end()
             return
