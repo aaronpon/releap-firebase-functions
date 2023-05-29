@@ -1,5 +1,6 @@
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
+import * as logger from 'firebase-functions/logger'
 import { verfiyJwt } from './auth'
 import { AppContext, TokenPayload } from './types'
 import {
@@ -84,9 +85,16 @@ export const createPost = async (ctx: AppContext, req: Request, res: Response) =
         ],
     })
 
-    const { digest } = await signer.signAndExecuteTransactionBlock({ transactionBlock: tx })
+    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showEvents: true, showEffects: true },
+    })
 
-    res.status(201).end({ digest })
+    if (errors) {
+        logger.error('SuiTxError', errors)
+    }
+
+    res.status(201).end({ digest, events, effects })
 }
 
 export const createComment = async (ctx: AppContext, req: Request, res: Response) => {
@@ -113,9 +121,16 @@ export const createComment = async (ctx: AppContext, req: Request, res: Response
         ],
     })
 
-    const { digest } = await signer.signAndExecuteTransactionBlock({ transactionBlock: tx })
+    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showEvents: true, showEffects: true },
+    })
 
-    res.status(201).json({ digest })
+    if (errors) {
+        logger.error('SuiTxError', errors)
+    }
+
+    res.status(201).json({ digest, events, effects })
 }
 
 export const likePost = async (ctx: AppContext, req: Request, res: Response) => {
@@ -135,9 +150,16 @@ export const likePost = async (ctx: AppContext, req: Request, res: Response) => 
         arguments: [tx.object(post), tx.object(profile), tx.object(adminCap)],
     })
 
-    const { digest } = await signer.signAndExecuteTransactionBlock({ transactionBlock: tx })
+    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showEvents: true, showEffects: true },
+    })
 
-    res.status(201).json({ digest })
+    if (errors) {
+        logger.error('SuiTxError', errors)
+    }
+
+    res.status(201).json({ digest, events, effects })
 }
 
 export const unlikePost = async (ctx: AppContext, req: Request, res: Response) => {
@@ -157,9 +179,16 @@ export const unlikePost = async (ctx: AppContext, req: Request, res: Response) =
         arguments: [tx.object(post), tx.object(profile), tx.object(adminCap)],
     })
 
-    const { digest } = await signer.signAndExecuteTransactionBlock({ transactionBlock: tx })
+    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showEvents: true, showEffects: true },
+    })
 
-    res.status(201).json({ digest })
+    if (errors) {
+        logger.error('SuiTxError', errors)
+    }
+
+    res.status(201).json({ digest, events, effects })
 }
 
 export const followProfile = async (ctx: AppContext, req: Request, res: Response) => {
@@ -179,9 +208,16 @@ export const followProfile = async (ctx: AppContext, req: Request, res: Response
         arguments: [tx.object(followingProfile), tx.object(profile), tx.object(adminCap)],
     })
 
-    const { digest } = await signer.signAndExecuteTransactionBlock({ transactionBlock: tx })
+    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showEvents: true, showEffects: true },
+    })
 
-    res.status(201).json({ digest })
+    if (errors) {
+        logger.error('SuiTxError', errors)
+    }
+
+    res.status(201).json({ digest, events, effects })
 }
 
 export const unfollowProfile = async (ctx: AppContext, req: Request, res: Response) => {
@@ -201,7 +237,14 @@ export const unfollowProfile = async (ctx: AppContext, req: Request, res: Respon
         arguments: [tx.object(followingProfile), tx.object(profile), tx.object(adminCap)],
     })
 
-    const { digest } = await signer.signAndExecuteTransactionBlock({ transactionBlock: tx })
+    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showEvents: true, showEffects: true },
+    })
 
-    res.status(201).json({ digest })
+    if (errors) {
+        logger.error('SuiTxError', errors)
+    }
+
+    res.status(201).json({ digest, events, effects })
 }

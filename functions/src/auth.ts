@@ -2,7 +2,6 @@ import { randomBytes } from 'crypto'
 import * as jsonwebtoken from 'jsonwebtoken'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
-import * as logger from 'firebase-functions/logger'
 import { fromSerializedSignature, IntentScope, JsonRpcProvider, mainnetConnection, verifyMessage } from '@mysten/sui.js'
 import { LoginChallengeToken, TokenPayload } from './types'
 import { getAllOwnedObjects } from './utils'
@@ -14,13 +13,13 @@ const signMessage = [
 ]
 
 export function verfiyJwt(jwt: string, secret: string) {
-    return jsonwebtoken.verify(jwt, secret, {
+    const token = jwt.replace(/^Bearer /, '')
+    return jsonwebtoken.verify(token, secret, {
         ignoreExpiration: false,
     }) as TokenPayload
 }
 
 export const requestLoginChallenge = (req: Request, res: Response) => {
-    logger.info('test', { structuredData: true })
     if (req.method !== 'POST') {
         res.status(403).send('Forbidden').end()
         return
@@ -67,7 +66,8 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
         return
     }
 
-    const decoded = jsonwebtoken.verify(reqJwt, process.env.JWT_SECRET as string, {
+    const token = reqJwt.replace(/^Bearer /, '')
+    const decoded = jsonwebtoken.verify(token, process.env.JWT_SECRET as string, {
         ignoreExpiration: false,
     }) as LoginChallengeToken
 
