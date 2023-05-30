@@ -1,3 +1,5 @@
+import fetch from 'node-fetch'
+
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import * as logger from 'firebase-functions/logger'
@@ -5,12 +7,14 @@ import { verfiyJwt } from './auth'
 import { AppContext, TokenPayload } from './types'
 import {
     JsonRpcProvider,
-    mainnetConnection,
     RawSigner,
     Ed25519Keypair,
     TransactionBlock,
     SUI_CLOCK_OBJECT_ID,
+    Connection,
 } from '@mysten/sui.js'
+
+globalThis.fetch = fetch as any
 
 export function applyJwtValidation(handler: (ctx: AppContext, req: Request, res: Response) => Promise<void>) {
     return async (req: Request, res: Response) => {
@@ -42,7 +46,7 @@ export function applyJwtValidation(handler: (ctx: AppContext, req: Request, res:
         let ctx: AppContext
         try {
             const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
-            const provider = new JsonRpcProvider(mainnetConnection)
+            const provider = new JsonRpcProvider(new Connection({ fullnode: 'https://sui-mainnet-rpc.nodereal.io' }))
             ctx = {
                 publicKey,
                 profiles,
@@ -94,7 +98,7 @@ export const createPost = async (ctx: AppContext, req: Request, res: Response) =
         logger.error('SuiTxError', errors)
     }
 
-    res.status(201).end({ digest, events, effects })
+    res.status(201).json({ digest, events, effects })
 }
 
 export const createComment = async (ctx: AppContext, req: Request, res: Response) => {

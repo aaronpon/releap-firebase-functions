@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import * as jsonwebtoken from 'jsonwebtoken'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
-import { fromSerializedSignature, IntentScope, JsonRpcProvider, mainnetConnection, verifyMessage } from '@mysten/sui.js'
+import { Connection, fromSerializedSignature, IntentScope, JsonRpcProvider, verifyMessage } from '@mysten/sui.js'
 import { LoginChallengeToken, TokenPayload } from './types'
 import { getAllOwnedObjects } from './utils'
 
@@ -119,7 +119,7 @@ export const extendToken = async (req: Request, res: Response) => {
 }
 
 async function genJWT(publicKey: string): Promise<string> {
-    const provider = new JsonRpcProvider(mainnetConnection)
+    const provider = new JsonRpcProvider(new Connection({ fullnode: 'https://sui-mainnet-rpc.nodereal.io' }))
     const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
 
     const profiles = (await getAllOwnedObjects(provider, publicKey))
