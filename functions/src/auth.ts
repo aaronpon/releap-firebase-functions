@@ -4,7 +4,7 @@ import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import { Connection, fromSerializedSignature, IntentScope, JsonRpcProvider, verifyMessage } from '@mysten/sui.js'
 import { LoginChallengeToken, TokenPayload } from './types'
-import { getAllOwnedObjects } from './utils'
+import { getAllOwnedObjects, RPC } from './utils'
 
 const signMessage = [
     `Sign in to Releap.`,
@@ -119,7 +119,7 @@ export const extendToken = async (req: Request, res: Response) => {
 }
 
 async function genJWT(publicKey: string): Promise<string> {
-    const provider = new JsonRpcProvider(new Connection({ fullnode: 'https://sui-mainnet-rpc.nodereal.io' }))
+    const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
     const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
 
     const profiles = (await getAllOwnedObjects(provider, publicKey))

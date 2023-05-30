@@ -11,8 +11,13 @@ import {
     unfollowProfile,
 } from './post'
 
+export { taskCreated, flagsUpdated } from './task'
+
 export const entrypoint = onRequest(
-    { secrets: ['JWT_SECRET', 'SEED_PHRASE'], cors: [/localhost/, /.*\.releap\.xyz$/] },
+    {
+        secrets: ['JWT_SECRET'],
+        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /feat-auth.d1doiqjkpgeoca.amplifyapp.com/],
+    },
     async (req, res) => {
         if (req.method === 'OPTIONS') {
             res.status(200).end()

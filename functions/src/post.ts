@@ -2,21 +2,18 @@ import fetch from 'node-fetch'
 
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
-import * as logger from 'firebase-functions/logger'
 import { verfiyJwt } from './auth'
-import { AppContext, TokenPayload } from './types'
-import {
-    JsonRpcProvider,
-    RawSigner,
-    Ed25519Keypair,
-    TransactionBlock,
-    SUI_CLOCK_OBJECT_ID,
-    Connection,
-} from '@mysten/sui.js'
+
+// The Firebase Admin SDK to access the Firebase Realtime Database.
+import admin from 'firebase-admin'
+admin.initializeApp()
+
+import { RequestContext, TaskRequest, TaskResponse, TokenPayload } from './types'
+import { obj2Arr } from './utils'
 
 globalThis.fetch = fetch as any
 
-export function applyJwtValidation(handler: (ctx: AppContext, req: Request, res: Response) => Promise<void>) {
+export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, res: Response) => Promise<void>) {
     return async (req: Request, res: Response) => {
         if (req.method !== 'POST') {
             res.status(403).send('Forbidden').end()
@@ -43,15 +40,11 @@ export function applyJwtValidation(handler: (ctx: AppContext, req: Request, res:
             res.status(400).send('Invaild JWT').end()
             return
         }
-        let ctx: AppContext
+        let ctx: RequestContext
         try {
-            const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
-            const provider = new JsonRpcProvider(new Connection({ fullnode: 'https://sui-mainnet-rpc.nodereal.io' }))
             ctx = {
                 publicKey,
                 profiles,
-                provider,
-                signer: new RawSigner(keypair, provider),
                 dappPackages: process.env.DAPP_PACKAGES?.split(',') ?? [],
                 recentPosts: process.env.RECENT_POSTS as string,
                 adminCap: process.env.ADMIN_CAP as string,
@@ -65,44 +58,27 @@ export function applyJwtValidation(handler: (ctx: AppContext, req: Request, res:
     }
 }
 
-export const createPost = async (ctx: AppContext, req: Request, res: Response) => {
-    const { signer, profiles, dappPackages, adminCap, recentPosts } = ctx
+export const createPost = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles } = ctx
     const { profile, imageUrl, content } = req.body.data
-
     if (!profiles.includes(profile)) {
         res.status(401).send("You don't own this profile").end()
         return
     }
 
-    const tx = new TransactionBlock()
-
-    tx.moveCall({
-        target: `${dappPackages[0]}::releap_social::create_post_with_admin_cap`,
-        typeArguments: [],
-        arguments: [
-            tx.object(profile),
-            tx.object(adminCap),
-            tx.object(recentPosts),
-            tx.pure(imageUrl),
-            tx.pure(content),
-            tx.object(SUI_CLOCK_OBJECT_ID),
-        ],
-    })
-
-    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
-
-    if (errors) {
-        logger.error('SuiTxError', errors)
+    const task: TaskRequest = {
+        data: {
+            action: 'createPost',
+            payload: { profile, imageUrl, content },
+        },
     }
-
-    res.status(201).json({ digest, events, effects })
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
 }
 
-export const createComment = async (ctx: AppContext, req: Request, res: Response) => {
-    const { signer, profiles, dappPackages, adminCap, recentPosts } = ctx
+export const createComment = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles } = ctx
     const { post, profile, content } = req.body.data
 
     if (!profiles.includes(profile)) {
@@ -110,35 +86,19 @@ export const createComment = async (ctx: AppContext, req: Request, res: Response
         return
     }
 
-    const tx = new TransactionBlock()
-
-    tx.moveCall({
-        target: `${dappPackages[0]}::releap_social::create_comment_with_admin_cap`,
-        typeArguments: [],
-        arguments: [
-            tx.object(post),
-            tx.object(profile),
-            tx.object(adminCap),
-            tx.object(recentPosts),
-            tx.pure(content),
-            tx.object(SUI_CLOCK_OBJECT_ID),
-        ],
-    })
-
-    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
-
-    if (errors) {
-        logger.error('SuiTxError', errors)
+    const task: TaskRequest = {
+        data: {
+            action: 'createComment',
+            payload: { profile, post, content },
+        },
     }
-
-    res.status(201).json({ digest, events, effects })
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
 }
 
-export const likePost = async (ctx: AppContext, req: Request, res: Response) => {
-    const { signer, profiles, dappPackages, adminCap } = ctx
+export const likePost = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles } = ctx
     const { profile, post } = req.body.data
 
     if (!profiles.includes(profile)) {
@@ -146,28 +106,19 @@ export const likePost = async (ctx: AppContext, req: Request, res: Response) => 
         return
     }
 
-    const tx = new TransactionBlock()
-
-    tx.moveCall({
-        target: `${dappPackages[0]}::releap_social::like_post_with_admin_cap`,
-        typeArguments: [],
-        arguments: [tx.object(post), tx.object(profile), tx.object(adminCap)],
-    })
-
-    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
-
-    if (errors) {
-        logger.error('SuiTxError', errors)
+    const task: TaskRequest = {
+        data: {
+            action: 'likePost',
+            payload: { profile, post },
+        },
     }
-
-    res.status(201).json({ digest, events, effects })
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
 }
 
-export const unlikePost = async (ctx: AppContext, req: Request, res: Response) => {
-    const { signer, profiles, dappPackages, adminCap } = ctx
+export const unlikePost = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles } = ctx
     const { profile, post } = req.body.data
 
     if (!profiles.includes(profile)) {
@@ -175,28 +126,38 @@ export const unlikePost = async (ctx: AppContext, req: Request, res: Response) =
         return
     }
 
-    const tx = new TransactionBlock()
-
-    tx.moveCall({
-        target: `${dappPackages[0]}::releap_social::unlike_post_with_admin_cap`,
-        typeArguments: [],
-        arguments: [tx.object(post), tx.object(profile), tx.object(adminCap)],
-    })
-
-    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
-
-    if (errors) {
-        logger.error('SuiTxError', errors)
+    const task: TaskRequest = {
+        data: {
+            action: 'unlikePost',
+            payload: { profile, post },
+        },
     }
-
-    res.status(201).json({ digest, events, effects })
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
 }
 
-export const followProfile = async (ctx: AppContext, req: Request, res: Response) => {
-    const { signer, profiles, dappPackages, adminCap } = ctx
+export const followProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles } = ctx
+    const { followingProfile, profile } = req.body.data
+
+    if (!profiles.includes(profile)) {
+        res.status(401).send("You don't own this profile").end()
+        return
+    }
+    const task: TaskRequest = {
+        data: {
+            action: 'followProfile',
+            payload: { profile, followingProfile },
+        },
+    }
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
+}
+
+export const unfollowProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles } = ctx
     const { followingProfile, profile } = req.body.data
 
     if (!profiles.includes(profile)) {
@@ -204,51 +165,24 @@ export const followProfile = async (ctx: AppContext, req: Request, res: Response
         return
     }
 
-    const tx = new TransactionBlock()
-
-    tx.moveCall({
-        target: `${dappPackages[0]}::releap_social::follow_with_admin_cap`,
-        typeArguments: [],
-        arguments: [tx.object(followingProfile), tx.object(profile), tx.object(adminCap)],
-    })
-
-    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
-
-    if (errors) {
-        logger.error('SuiTxError', errors)
+    const task: TaskRequest = {
+        data: {
+            action: 'unfollowProfile',
+            payload: { profile, followingProfile },
+        },
     }
-
-    res.status(201).json({ digest, events, effects })
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
 }
 
-export const unfollowProfile = async (ctx: AppContext, req: Request, res: Response) => {
-    const { signer, profiles, dappPackages, adminCap } = ctx
-    const { followingProfile, profile } = req.body.data
-
-    if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+async function waitTask(taskId: string) {
+    while (true) {
+        const taskRes = await admin.database().ref(`/tasks_res/${taskId}`).once('value')
+        const json = taskRes.toJSON() as unknown as TaskResponse | undefined
+        if (json != null) {
+            await admin.database().ref(`/tasks_res/${taskId}`).remove()
+            return obj2Arr(json)
+        }
     }
-
-    const tx = new TransactionBlock()
-
-    tx.moveCall({
-        target: `${dappPackages[0]}::releap_social::unfollow_with_admin_cap`,
-        typeArguments: [],
-        arguments: [tx.object(followingProfile), tx.object(profile), tx.object(adminCap)],
-    })
-
-    const { digest, errors, events, effects } = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
-
-    if (errors) {
-        logger.error('SuiTxError', errors)
-    }
-
-    res.status(201).json({ digest, events, effects })
 }
