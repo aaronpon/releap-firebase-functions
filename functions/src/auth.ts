@@ -104,7 +104,9 @@ export const extendToken = async (req: Request, res: Response) => {
         return
     }
 
-    const { publicKey } = jsonwebtoken.verify(reqJwt, process.env.JWT_SECRET as string, {
+    const token = reqJwt.replace(/^Bearer /, '')
+
+    const { publicKey } = jsonwebtoken.verify(token, process.env.JWT_SECRET as string, {
         ignoreExpiration: false,
     }) as TokenPayload
 
