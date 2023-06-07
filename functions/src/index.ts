@@ -17,6 +17,8 @@ import { scrapeProfile as scrapeTweets } from './api'
 import { ApifyTwitterRes } from './types'
 import admin from 'firebase-admin'
 
+import * as fireStore from './fireStore'
+
 export { taskCreated, flagsUpdated } from './task'
 
 export const entrypoint = onRequest(
@@ -114,3 +116,46 @@ export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => 
         }),
     )
 })
+
+export const fireStoreEntrypoint = onRequest(
+    {
+        secrets: ['JWT_SECRET'],
+        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /feat-auth.d1doiqjkpgeoca.amplifyapp.com/],
+    },
+    async (req, res) => {
+        if (req.method === 'OPTIONS') {
+            res.status(200).end()
+            return
+        }
+
+        logger.info(`FireStore action: ${req.body.action}`, { data: req.body.data })
+        switch (req.body.action) {
+            case 'createProfile':
+                applyJwtValidation(fireStore.createProfile)(req, res)
+                break
+            case 'createPost':
+                applyJwtValidation(fireStore.createPost)(req, res)
+                break
+            case 'createComment':
+                applyJwtValidation(fireStore.createComment)(req, res)
+                break
+            case 'followProfile':
+                applyJwtValidation(fireStore.followProfile)(req, res)
+                break
+            case 'likePost':
+                applyJwtValidation(fireStore.likePost)(req, res)
+                break
+            case 'likeComment':
+                applyJwtValidation(fireStore.likeComment)(req, res)
+                break
+            case 'mintBadge':
+                applyJwtValidation(fireStore.mintBadge)(req, res)
+                break
+            case 'createBadgeMint':
+                applyJwtValidation(fireStore.createBadgeMint)(req, res)
+                break
+            default:
+                res.status(400).send('Unexpected action').end()
+        }
+    },
+)
