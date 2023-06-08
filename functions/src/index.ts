@@ -65,7 +65,7 @@ export const entrypoint = onRequest(
     },
 )
 
-export const twitterPosting = pubsub.schedule('*/15 * * * *').onRun(async () => {
+export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => {
     const profilesToScrap = await getTwitterScraperProfiles()
     await Promise.all(
         profilesToScrap.map(async (profile) => {
@@ -79,9 +79,17 @@ export const twitterPosting = pubsub.schedule('*/15 * * * *').onRun(async () => 
                 response.map(async (tweet) => {
                     if (new Date(tweet.created_at) > new Date(lastUpdate)) {
                         logger.info(`Got Tweet profiles: ${profile.twitter}, ${tweet.full_text}`)
+
+                        const mediaUrl =
+                            tweet.media.length > 0
+                                ? tweet.media[0]?.video_url == null
+                                    ? tweet.media[0].media_url
+                                    : tweet.media[0].video_url.split('.mp4')[0] + '.mp4'
+                                : ''
+
                         const res: any = await adminCreatePost(
                             profile.profileId,
-                            tweet.media[0]?.media_url ?? null,
+                            mediaUrl,
                             tweet.full_text.replace(/https:\/\/t\.co\S*/g, ''),
                         )
 
