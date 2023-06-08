@@ -24,7 +24,7 @@ export const scrapeProfile = async (twitterProfileName: string): Promise<ApifyTw
         searchMode: 'live',
         skipPromotedTweets: false,
         skipRetweets: true,
-        tweetsDesired: 2,
+        tweetsDesired: 1,
         useAdvancedSearch: false,
         useNewProfileScraper: false,
         useNewTweetsScraper: false,
