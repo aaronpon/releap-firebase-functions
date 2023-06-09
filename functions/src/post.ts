@@ -77,6 +77,18 @@ export const createPost = async (ctx: RequestContext, req: Request, res: Respons
     res.status(201).json(result)
 }
 
+export const adminCreatePost = async (profile: string, imageUrl: string, content: string) => {
+    const task: TaskRequest = {
+        data: {
+            action: 'createPost',
+            payload: { profile, imageUrl, content },
+        },
+    }
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    return result
+}
+
 export const createComment = async (ctx: RequestContext, req: Request, res: Response) => {
     const { profiles } = ctx
     const { post, profile, content } = req.body.data

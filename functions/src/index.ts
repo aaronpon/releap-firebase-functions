@@ -1,4 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https'
+import { pubsub } from 'firebase-functions'
 import * as logger from 'firebase-functions/logger'
 import { extendToken, requestLoginChallenge, submitLoginChallenge } from './auth'
 import {
@@ -9,7 +10,12 @@ import {
     unlikePost,
     followProfile,
     unfollowProfile,
+    adminCreatePost,
 } from './post'
+import { getTwitterScraperProfiles, updateLastScrap as updateLastScrape } from './firestore'
+import { scrapeProfile as scrapeTweets } from './api'
+import { ApifyTwitterRes } from './types'
+import admin from 'firebase-admin'
 
 export { taskCreated, flagsUpdated } from './task'
 
@@ -58,3 +64,53 @@ export const entrypoint = onRequest(
         }
     },
 )
+
+export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => {
+    const profilesToScrap = await getTwitterScraperProfiles()
+    await Promise.all(
+        profilesToScrap.map(async (profile) => {
+            const lastUpdate = profile.lastUpdate
+
+            logger.info(`Scraping profiles: ${profile.twitter}, last update at ${lastUpdate}`)
+
+            const response: ApifyTwitterRes[] = await scrapeTweets(profile.twitter)
+
+            await Promise.all(
+                response.map(async (tweet) => {
+                    if (new Date(tweet.created_at) > new Date(lastUpdate)) {
+                        logger.info(`Got Tweet profiles: ${profile.twitter}, ${tweet.full_text}`)
+
+                        const mediaUrl =
+                            tweet.media.length > 0
+                                ? tweet.media[0]?.video_url == null
+                                    ? tweet.media[0].media_url
+                                    : tweet.media[0].video_url.split('.mp4')[0] + '.mp4'
+                                : ''
+
+                        const res: any = await adminCreatePost(
+                            profile.profileId,
+                            mediaUrl,
+                            tweet.full_text.replace(/https:\/\/t\.co\S*/g, ''),
+                        )
+
+                        const createdPostId =
+                            res.effects?.created?.find((it: any) => {
+                                if (typeof it.owner === 'object' && 'Shared' in it.owner) {
+                                    return it.owner.Shared.initial_shared_version === it.reference.version
+                                }
+                                return ''
+                            })?.reference?.objectId ?? ''
+
+                        await admin.firestore().collection('posts').doc(createdPostId).create({
+                            postId: createdPostId,
+                            timeStamp: admin.firestore.FieldValue.serverTimestamp(),
+                            profileId: profile.profileId,
+                        })
+                    }
+                }),
+            )
+
+            await updateLastScrape(profile.name, new Date().toISOString())
+        }),
+    )
+})

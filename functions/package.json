@@ -16,9 +16,11 @@
     "main": "lib/index.js",
     "dependencies": {
         "@mysten/sui.js": "^0.34.1",
+        "apify-client": "^2.7.1",
+        "axios": "^1.4.0",
         "eslint-config-prettier": "^8.8.0",
-        "firebase-admin": "^11.8.0",
-        "firebase-functions": "^4.3.1",
+        "firebase-admin": "^11.9.0",
+        "firebase-functions": "^4.4.0",
         "jsonwebtoken": "^9.0.0",
         "node-fetch": "2"
     },
