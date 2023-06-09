@@ -3,7 +3,7 @@ import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 
 import { RequestContext } from './types'
-import { DocumentData } from 'firebase-admin/firestore'
+import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 
 const db = admin.firestore()
 export const getTwitterScraperProfiles = async () => {
@@ -47,7 +47,7 @@ export const createPost = async (ctx: RequestContext, req: Request, res: Respons
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('posts', postId, { postId, profileId, timeStamp })
 
     res.status(201).end()
@@ -61,7 +61,7 @@ export const createComment = async (ctx: RequestContext, req: Request, res: Resp
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('comments', postId, { postId, parentId, profileId, timeStamp })
     await storeDoc('events', `${parentId}.${profileId}.comment`, {
         type: 'comment',
@@ -83,7 +83,7 @@ export const followProfile = async (ctx: RequestContext, req: Request, res: Resp
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('events', `${followeeId}.${followerId}.follow`, {
         type: 'follow',
         profileId: followeeId,
@@ -104,13 +104,12 @@ export const likePost = async (ctx: RequestContext, req: Request, res: Response)
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('events', `${postId}.${profileId}.like`, {
         type: 'like',
         profileId: postAuthorId,
         sender: profileId,
-        post: null,
-        postId: postId,
+        post: postId,
         timeStamp,
     })
 
@@ -125,7 +124,7 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('events', `${postId}.${commentId}.${profileId}.like`, {
         type: 'like',
         profileId: postAuthorId,
@@ -146,7 +145,7 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('badges', createdBadgeId, {
         badgeId,
         minter,
@@ -165,7 +164,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         return
     }
 
-    const timeStamp = Date.now()
+    const timeStamp = Timestamp.now()
     await storeDoc('badgeId', badgeId, {
         badgeId,
         name,
