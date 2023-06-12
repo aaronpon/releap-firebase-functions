@@ -18,12 +18,13 @@ import { ApifyTwitterRes } from './types'
 import admin from 'firebase-admin'
 
 import * as firestore from './firestore'
+import * as oauth from './oauth'
 
 export { taskCreated, flagsUpdated } from './task'
 
 export const entrypoint = onRequest(
     {
-        secrets: ['JWT_SECRET'],
+        secrets: ['JWT_SECRET', 'TWITTER_COMSUMER_SECRET'],
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /feat-auth.d1doiqjkpgeoca.amplifyapp.com/],
     },
     async (req, res) => {
@@ -34,6 +35,7 @@ export const entrypoint = onRequest(
 
         logger.info(`Action: ${req.body.action}`, { data: req.body.data })
         switch (req.body.action) {
+            // JWT login
             case 'requestLoginChallenge':
                 requestLoginChallenge(req, res)
                 break
@@ -43,6 +45,7 @@ export const entrypoint = onRequest(
             case 'extendToken':
                 extendToken(req, res)
                 break
+            // Sponsored tx
             case 'createPost':
                 applyJwtValidation(createPost)(req, res)
                 break
@@ -61,6 +64,7 @@ export const entrypoint = onRequest(
             case 'unfollowProfile':
                 applyJwtValidation(unfollowProfile)(req, res)
                 break
+            // Firestore
             case 'fireStoreCreateProfile':
                 applyJwtValidation(firestore.createProfile)(req, res)
                 break
@@ -84,6 +88,16 @@ export const entrypoint = onRequest(
                 break
             case 'fireStoreCreateBadgeMint':
                 applyJwtValidation(firestore.createBadgeMint)(req, res)
+                break
+            // Twitter OAuth
+            case 'requestTwitterOAuthCode':
+                applyJwtValidation(oauth.requestTwitterOAuthCode)(req, res)
+                break
+            case 'connectTwitter':
+                applyJwtValidation(oauth.connectTwitter)(req, res)
+                break
+            case 'disconnectTwitter':
+                applyJwtValidation(oauth.disconnectTwitter)(req, res)
                 break
             default:
                 res.status(400).send('Unexpected action').end()

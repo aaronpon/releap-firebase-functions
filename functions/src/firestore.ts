@@ -21,6 +21,14 @@ async function storeDoc(collection: string, docId: string, data: DocumentData) {
     const ref = db.collection(collection).doc(docId)
     return await ref.set(data)
 }
+export const updateUserTwitterData = async (
+    profileAddress: string,
+    twitterId: string | null,
+    twitterHandle: string | null,
+) => {
+    const ref = db.collection('users').doc(profileAddress)
+    return await ref.update({ twitterId, twitterHandle })
+}
 
 /*
  * Events schema
