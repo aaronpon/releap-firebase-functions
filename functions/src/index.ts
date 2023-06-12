@@ -17,6 +17,8 @@ import { scrapeProfile as scrapeTweets } from './api'
 import { ApifyTwitterRes } from './types'
 import admin from 'firebase-admin'
 
+import * as firestore from './firestore'
+
 export { taskCreated, flagsUpdated } from './task'
 
 export const entrypoint = onRequest(
@@ -58,6 +60,30 @@ export const entrypoint = onRequest(
                 break
             case 'unfollowProfile':
                 applyJwtValidation(unfollowProfile)(req, res)
+                break
+            case 'fireStoreCreateProfile':
+                applyJwtValidation(firestore.createProfile)(req, res)
+                break
+            case 'fireStoreCreatePost':
+                applyJwtValidation(firestore.createPost)(req, res)
+                break
+            case 'fireStoreCreateComment':
+                applyJwtValidation(firestore.createComment)(req, res)
+                break
+            case 'fireStoreFollowProfile':
+                applyJwtValidation(firestore.followProfile)(req, res)
+                break
+            case 'fireStoreLikePost':
+                applyJwtValidation(firestore.likePost)(req, res)
+                break
+            case 'fireStoreLikeComment':
+                applyJwtValidation(firestore.likeComment)(req, res)
+                break
+            case 'fireStoreMintBadge':
+                applyJwtValidation(firestore.mintBadge)(req, res)
+                break
+            case 'fireStoreCreateBadgeMint':
+                applyJwtValidation(firestore.createBadgeMint)(req, res)
                 break
             default:
                 res.status(400).send('Unexpected action').end()
