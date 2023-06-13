@@ -25,7 +25,7 @@ export { taskCreated, flagsUpdated } from './task'
 export const entrypoint = onRequest(
     {
         secrets: ['JWT_SECRET', 'TWITTER_COMSUMER_SECRET'],
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /feat-auth.d1doiqjkpgeoca.amplifyapp.com/],
+        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
     },
     async (req, res) => {
         if (req.method === 'OPTIONS') {
