@@ -24,7 +24,7 @@ export { taskCreated, flagsUpdated } from './task'
 
 export const entrypoint = onRequest(
     {
-        secrets: ['JWT_SECRET', 'TWITTER_COMSUMER_SECRET'],
+        secrets: ['JWT_SECRET', 'TWITTER_COMSUMER_SECRET', 'TWITTER_BEARER_TOKEN'],
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
     },
     async (req, res) => {
@@ -88,6 +88,9 @@ export const entrypoint = onRequest(
                 break
             case 'fireStoreCreateBadgeMint':
                 applyJwtValidation(firestore.createBadgeMint)(req, res)
+                break
+            case 'badgeMintEligibility':
+                applyJwtValidation(firestore.badgeMintEligibility)(req, res)
                 break
             // Twitter OAuth
             case 'requestTwitterOAuthCode':

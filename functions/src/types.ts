@@ -104,3 +104,17 @@ export interface Media {
     type: string
     video_url: string
 }
+
+export interface TwitterQuest {
+    like: string | undefined
+    follow: string | undefined
+    reply: string | undefined
+    retweet: string | undefined
+}
+
+export interface ProfileQuest {
+    like: boolean
+    follow: boolean
+    reply: boolean
+    retweet: boolean
+}
