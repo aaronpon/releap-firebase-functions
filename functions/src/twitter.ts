@@ -5,11 +5,14 @@ function getTwitterBearerToken() {
     return process.env.TWITTER_BEARER_TOKEN
 }
 
+// don't check like action
 export async function isLiked(userId: string, tweetId: string): Promise<boolean> {
+    return true
+    /*
     const token = getTwitterBearerToken()
     try {
         const { data } = await axios.get<{ id_str: string }[]>(
-            `https://api.twitter.com/1.1/favorites/list.json?count=5&user_id=${userId}`,
+            `https://api.twitter.com/1.1/favorites/list.json?user_id=${userId}`,
             {
                 headers: { Authorization: token },
             },
@@ -20,6 +23,7 @@ export async function isLiked(userId: string, tweetId: string): Promise<boolean>
         logger.error('Fail to get isLiked', err)
         return false
     }
+    */
 }
 
 export async function isFollowed(followerId: string, followeeHandle: string): Promise<boolean> {
