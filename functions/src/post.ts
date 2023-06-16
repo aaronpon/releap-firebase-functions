@@ -9,7 +9,8 @@ import admin from 'firebase-admin'
 admin.initializeApp()
 
 import { RequestContext, TaskRequest, TaskResponse, TokenPayload } from './types'
-import { obj2Arr } from './utils'
+import { obj2Arr, RPC } from './utils'
+import { Connection, JsonRpcProvider } from '@mysten/sui.js'
 
 globalThis.fetch = fetch as any
 
@@ -48,6 +49,7 @@ export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, 
                 dappPackages: process.env.DAPP_PACKAGES?.split(',') ?? [],
                 recentPosts: process.env.RECENT_POSTS as string,
                 adminCap: process.env.ADMIN_CAP as string,
+                provider: new JsonRpcProvider(new Connection({ fullnode: RPC })),
             }
         } catch (err) {
             res.status(500).send('Fail to create AppContext').end()

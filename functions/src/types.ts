@@ -22,7 +22,7 @@ export interface AppContext {
 }
 
 export type ShareContext = Omit<AppContext, 'publicKey' | 'profiles'>
-export type RequestContext = Omit<AppContext, 'provider' | 'signer'>
+export type RequestContext = Omit<AppContext, 'signer'>
 
 export interface TaskRequest {
     data:

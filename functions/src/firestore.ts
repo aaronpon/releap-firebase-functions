@@ -5,6 +5,7 @@ import { Response } from 'express'
 import { ProfileQuest, RequestContext, TwitterQuest } from './types'
 import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { isFollowed, isLiked, isReplyed, isRetweeted } from './twitter'
+import { sleep } from './utils'
 
 const db = admin.firestore()
 db.settings({ ignoreUndefinedProperties: true })
@@ -149,9 +150,50 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
 
 export const mintBadge = async (ctx: RequestContext, req: Request, res: Response) => {
     const { createdBadgeId, badgeId, minter, minterProfile } = req.body.data
-    const { profiles } = ctx
+    const { profiles, provider, publicKey } = ctx
     if (!profiles.includes(minterProfile)) {
         res.status(401).send("You don't own this profile").end()
+        return
+    }
+
+    const mintedBadge = (await db.collection('badges').doc(createdBadgeId).get()).data()
+
+    if (mintedBadge != null) {
+        res.status(400).send('The badge already created').end()
+        return
+    }
+
+    const badge = (await db.collection('badgeId').doc(badgeId).get()).data()
+
+    if (badge == null) {
+        res.status(400).send('Invaild badge').end()
+        return
+    }
+
+    try {
+        // sleep 2 sec, to wait RPC sync
+        await sleep(2000)
+        const { data, error } = await provider.getObject({
+            id: badgeId,
+            options: { showType: true, showBcs: false, showOwner: true, showContent: false, showDisplay: false },
+        })
+        if (error != null || data == null) {
+            res.status(400).send('Fail to get badge from chain').end()
+            return
+        }
+        if (!data.type?.match(/releap_badge/)) {
+            res.status(400).send('Incorrect data type').end()
+            return
+        }
+        const isVaildOwner =
+            typeof data.owner === 'object' && 'AddressOwner' in data.owner && data.owner?.AddressOwner === publicKey
+
+        if (!isVaildOwner) {
+            res.status(400).send('Incorrect owner').end()
+            return
+        }
+    } catch (err) {
+        res.status(400).send('Fail to get badge from chain').end()
         return
     }
 
@@ -163,11 +205,20 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
         timeStamp,
     })
 
+    await storeDoc('points', `${badgeId}.${minter}`, {
+        badgeId,
+        minter,
+        campaignProfile: badge.profileId,
+        point: badge.point ?? 0,
+        timeStamp,
+    })
+
     res.status(201).end()
 }
 
 export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { badgeId, name, description, maxSupply, imageUrl, profileId, mintList, order, twitterQuest } = req.body.data
+    const { badgeId, name, description, maxSupply, imageUrl, profileId, mintList, order, twitterQuest, point } =
+        req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         res.status(401).send("You don't own this profile").end()
@@ -191,6 +242,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         profileId,
         mintList: mintList ?? [],
         order: order ?? 0,
+        point: point ?? 0,
         timeStamp,
         twitterQuest,
     })
