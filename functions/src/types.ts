@@ -26,7 +26,8 @@ export interface AppContext {
     // env
     dappPackages: string[]
     recentPosts: string
-    profileIndex: string
+    index: string
+    profileTable: string
     adminCap: string
 }
 

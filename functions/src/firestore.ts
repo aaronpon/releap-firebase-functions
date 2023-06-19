@@ -20,7 +20,12 @@ export const updateLastScrap = async (profileName: string, createdAt: string) =>
     await db.collection('twitterScraper').doc(profileName).update({ lastUpdate: createdAt })
 }
 
-async function storeDoc(collection: string, docId: string, data: DocumentData) {
+export async function getDoc<T>(collection: string, docId: string): Promise<T> {
+    const ref = db.collection(collection).doc(docId)
+    return (await ref.get()).data() as T
+}
+
+export async function storeDoc(collection: string, docId: string, data: DocumentData) {
     const ref = db.collection(collection).doc(docId)
     return await ref.set(data)
 }
@@ -157,14 +162,14 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
         return
     }
 
-    const mintedBadge = (await db.collection('badges').doc(createdBadgeId).get()).data()
+    const mintedBadge = await getDoc('badges', createdBadgeId)
 
     if (mintedBadge != null) {
         res.status(400).send('The badge already created').end()
         return
     }
 
-    const badge = (await db.collection('badgeId').doc(badgeId).get()).data()
+    const badge = await getDoc<{ profileId: string; point: number }>('badgeId', badgeId)
 
     if (badge == null) {
         res.status(400).send('Invaild badge').end()
@@ -229,7 +234,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         return
     }
 
-    const existing = (await db.collection('badgeId').doc(badgeId).get()).data()
+    const existing = await getDoc<{ profileId: string }>('badgeId', badgeId)
 
     if (existing != null && existing.profileId !== profileId) {
         res.status(401).send("You don't own this badge").end()
@@ -279,9 +284,10 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
 
     let eligible = false
     if (twitterQuest != null) {
-        const { like, follow, reply, retweet }: ProfileQuest = ((
-            await db.collection('profileBadgeQuests').doc(`${badgeId}.${profileId}`).get()
-        ).data() ?? { like: false, follow: false, reply: false, retweet: false }) as ProfileQuest
+        const { like, follow, reply, retweet }: ProfileQuest = ((await getDoc(
+            'profileBadgeQuests',
+            `${badgeId}.${profileId}`,
+        )) ?? { like: false, follow: false, reply: false, retweet: false }) as ProfileQuest
 
         // make as completed if not require
         const profileQuestAfterCheck: ProfileQuest = {

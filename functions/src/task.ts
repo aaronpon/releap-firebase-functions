@@ -59,7 +59,8 @@ export const flagsUpdated = onValueWritten(
             dappPackages: process.env.DAPP_PACKAGES?.split(',') ?? [],
             recentPosts: process.env.RECENT_POSTS as string,
             adminCap: process.env.ADMIN_CAP as string,
-            profileIndex: process.env.PROFILE_INDEX as string,
+            index: process.env.INDEX as string,
+            profileTable: process.env.PROFILE_TABLE as string,
         }
 
         try {
@@ -80,14 +81,14 @@ export const flagsUpdated = onValueWritten(
 )
 
 async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Promise<SuiTransactionBlockResponse> {
-    const { signer, dappPackages, adminCap, recentPosts, profileIndex } = ctx
+    const { signer, dappPackages, adminCap, recentPosts, index } = ctx
     const tx = tasks.reduce((tx, curr) => {
         switch (curr.data.action) {
             case 'createProfile':
                 tx.moveCall({
                     target: `${dappPackages[0]}::releap_social::new_profile_with_admin_cap`,
                     arguments: [
-                        tx.object(profileIndex),
+                        tx.object(index),
                         tx.pure(curr.data.payload.profileName),
                         tx.object(SUI_CLOCK_OBJECT_ID),
                         tx.object(adminCap),

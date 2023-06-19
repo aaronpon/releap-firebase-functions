@@ -8,11 +8,13 @@ import admin from 'firebase-admin'
 admin.initializeApp()
 
 import { RequestContext, TaskRequest, TaskResponse } from './types'
-import { obj2Arr } from './utils'
+import { obj2Arr, sleep } from './utils'
+import { getDoc, storeDoc } from './firestore'
 
 globalThis.fetch = fetch as any
 
 export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { isEth, publicKey, provider, profileTable } = ctx
     const { profileName } = req.body.data
 
     const task: TaskRequest = {
@@ -24,8 +26,24 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
 
-    if (ctx.isEth) {
-        // store the eth wallet <-> profile mapping off chain
+    if (isEth) {
+        // store the eth wallet <-> profile mapping off-chain
+        await sleep(2000)
+        const df = await provider.getDynamicFieldObject({
+            parentId: profileTable,
+            name: { type: '0x1::string::String', value: profileName },
+        })
+
+        const profile = df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value
+
+        if (profile != null) {
+            const ethProfile = (await getDoc<{ ethAddress: string; profiles: string[] }>('ethProfile', publicKey)) ?? {
+                ethAddress: publicKey,
+                profiles: [],
+            }
+            ethProfile.profiles.push(profile)
+            await storeDoc('ethProfile', publicKey, ethProfile)
+        }
     }
 
     res.status(201).json(result)

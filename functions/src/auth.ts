@@ -51,7 +51,8 @@ export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, 
                 dappPackages: process.env.DAPP_PACKAGES?.split(',') ?? [],
                 recentPosts: process.env.RECENT_POSTS as string,
                 adminCap: process.env.ADMIN_CAP as string,
-                profileIndex: process.env.PROFILE_INDEX as string,
+                index: process.env.INDEX as string,
+                profileTable: process.env.PROFILE_TABLE as string,
                 provider: new JsonRpcProvider(new Connection({ fullnode: RPC })),
             }
         } catch (err) {
