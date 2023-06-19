@@ -1,9 +1,15 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { pubsub } from 'firebase-functions'
 import * as logger from 'firebase-functions/logger'
-import { extendToken, requestLoginChallenge, submitLoginChallenge } from './auth'
 import {
+    extendToken,
     applyJwtValidation,
+    requestEthLoginChallenge,
+    requestLoginChallenge,
+    submitEthLoginChallenge,
+    submitLoginChallenge,
+} from './auth'
+import {
     createPost,
     createComment,
     likePost,
@@ -11,7 +17,8 @@ import {
     followProfile,
     unfollowProfile,
     adminCreatePost,
-} from './post'
+    createProfile,
+} from './sponsorTx'
 import { getTwitterScraperProfiles, updateLastScrap as updateLastScrape } from './firestore'
 import { scrapeProfile as scrapeTweets } from './api'
 import { ApifyTwitterRes } from './types'
@@ -42,10 +49,19 @@ export const entrypoint = onRequest(
             case 'submitLoginChallenge':
                 submitLoginChallenge(req, res)
                 break
+            case 'requestEthLoginChallenge':
+                requestEthLoginChallenge(req, res)
+                break
+            case 'submitEthLoginChallenge':
+                submitEthLoginChallenge(req, res)
+                break
             case 'extendToken':
                 extendToken(req, res)
                 break
             // Sponsored tx
+            case 'createProfile':
+                applyJwtValidation(createProfile)(req, res)
+                break
             case 'createPost':
                 applyJwtValidation(createPost)(req, res)
                 break

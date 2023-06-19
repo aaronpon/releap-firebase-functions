@@ -3,14 +3,65 @@ import * as jsonwebtoken from 'jsonwebtoken'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import { Connection, fromSerializedSignature, IntentScope, JsonRpcProvider, verifyMessage } from '@mysten/sui.js'
-import { LoginChallengeToken, TokenPayload } from './types'
+import { LoginChallengeToken, LoginChallengeTokenEth, RequestContext, TokenPayload } from './types'
 import { getAllOwnedObjects, RPC } from './utils'
+import { SiweMessage } from 'siwe'
 
 const signMessage = [
     `Sign in to Releap.`,
     `This action will authenticate your wallet and enable to access the Releap.`,
     `Nonce:`,
 ]
+
+export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, res: Response) => Promise<void>) {
+    return async (req: Request, res: Response) => {
+        if (req.method !== 'POST') {
+            res.status(403).send('Forbidden').end()
+            return
+        }
+
+        const jwt = req.headers['authorization']
+        if (jwt == null) {
+            res.status(400).send('Missing authorization header').end()
+            return
+        }
+
+        let publicKey
+        let profiles
+        let isEth = false
+        try {
+            const tokenPayload: TokenPayload = verfiyJwt(jwt, process.env.JWT_SECRET as string)
+            if (tokenPayload.publicKey == null) {
+                res.status(400).send('Invalid JWT').end()
+                return
+            }
+            publicKey = tokenPayload.publicKey
+            profiles = tokenPayload.profiles
+            isEth = tokenPayload.isEth
+        } catch (err) {
+            res.status(400).send('Invaild JWT').end()
+            return
+        }
+        let ctx: RequestContext
+        try {
+            ctx = {
+                publicKey,
+                profiles,
+                isEth,
+                dappPackages: process.env.DAPP_PACKAGES?.split(',') ?? [],
+                recentPosts: process.env.RECENT_POSTS as string,
+                adminCap: process.env.ADMIN_CAP as string,
+                profileIndex: process.env.PROFILE_INDEX as string,
+                provider: new JsonRpcProvider(new Connection({ fullnode: RPC })),
+            }
+        } catch (err) {
+            res.status(500).send('Fail to create AppContext').end()
+            return
+        }
+
+        await handler(ctx, req, res)
+    }
+}
 
 export function verfiyJwt(jwt: string, secret: string) {
     const token = jwt.replace(/^Bearer /, '')
@@ -87,7 +138,7 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
         return
     }
 
-    const jwt = await genJWT(publicKey)
+    const jwt = await genJWT(publicKey, { isEth: false })
 
     res.status(200).json({ jwt, publicKey })
 }
@@ -106,7 +157,7 @@ export const extendToken = async (req: Request, res: Response) => {
 
     const token = reqJwt.replace(/^Bearer /, '')
 
-    const { publicKey } = jsonwebtoken.verify(token, process.env.JWT_SECRET as string, {
+    const { publicKey, isEth } = jsonwebtoken.verify(token, process.env.JWT_SECRET as string, {
         ignoreExpiration: false,
     }) as TokenPayload
 
@@ -115,12 +166,12 @@ export const extendToken = async (req: Request, res: Response) => {
         return
     }
 
-    const jwt = await genJWT(publicKey)
+    const jwt = await genJWT(publicKey, { isEth: isEth ?? false })
 
     res.status(200).json({ jwt, publicKey })
 }
 
-async function genJWT(publicKey: string): Promise<string> {
+async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<string> {
     const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
     const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
 
@@ -135,9 +186,79 @@ async function genJWT(publicKey: string): Promise<string> {
     const payload: TokenPayload = {
         publicKey,
         profiles,
+        isEth: options.isEth,
     }
 
     return jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
         expiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
     })
+}
+
+export const requestEthLoginChallenge = (req: Request, res: Response) => {
+    if (req.method !== 'POST') {
+        res.status(403).send('Forbidden').end()
+        return
+    }
+
+    const publicKey: string = req.body.data.publicKey
+    if (publicKey == null) {
+        res.status(400).send('Missing publicKey').end()
+        return
+    }
+    const nonce = randomBytes(8).toString('hex')
+
+    const payload: LoginChallengeTokenEth = {
+        attemptPublicKey: publicKey,
+        nonce,
+        statement: signMessage.join('\r\n'),
+    }
+
+    const jwt = jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
+        expiresIn: '120s',
+    })
+
+    res.status(200).json({
+        jwt,
+        statement: signMessage.join('\r\n'),
+        nonce,
+    })
+}
+
+export const submitEthLoginChallenge = async (req: Request, res: Response) => {
+    if (req.method !== 'POST') {
+        res.status(403).send('Forbidden').end()
+        return
+    }
+    const reqJwt = req.headers['authorization']
+    const signature = req.body.data.signature
+
+    if (reqJwt == null) {
+        res.status(400).send('Missing authorization header').end()
+        return
+    }
+
+    if (signature == null) {
+        res.status(400).send('Missing singature').end()
+        return
+    }
+
+    const token = reqJwt.replace(/^Bearer /, '')
+    const decoded = jsonwebtoken.verify(token, process.env.JWT_SECRET as string, {
+        ignoreExpiration: false,
+    }) as LoginChallengeTokenEth
+
+    const { attemptPublicKey: publicKey, nonce, statement } = decoded
+
+    const siweMessage = new SiweMessage({ nonce, address: publicKey, statement })
+
+    const { success } = await siweMessage.verify({ signature })
+
+    if (!success) {
+        res.status(400).send('Invalid singature').end()
+        return
+    }
+
+    const jwt = await genJWT(publicKey, { isEth: true })
+
+    res.status(200).json({ jwt, publicKey })
 }
