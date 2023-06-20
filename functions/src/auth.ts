@@ -7,11 +7,7 @@ import { LoginChallengeToken, LoginChallengeTokenEth, RequestContext, TokenPaylo
 import { getAllOwnedObjects, RPC } from './utils'
 import { SiweMessage } from 'siwe'
 
-const signMessage = [
-    `Sign in to Releap.`,
-    `This action will authenticate your wallet and enable to access the Releap.`,
-    `Nonce:`,
-]
+const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
 
 export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, res: Response) => Promise<void>) {
     return async (req: Request, res: Response) => {
@@ -176,13 +172,16 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
     const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
     const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
 
-    const profiles = (await getAllOwnedObjects(provider, publicKey))
-        .filter(
-            (it) =>
-                dappPackages.some((dappPackage) => it.data?.type?.startsWith(dappPackage)) &&
-                it.data?.type?.endsWith('ProfileOwnerCap'),
-        )
-        .map((it) => it.data?.content?.dataType === 'moveObject' && it.data?.content.fields.profile)
+    let profiles = []
+    if (!options.isEth) {
+        profiles = (await getAllOwnedObjects(provider, publicKey))
+            .filter(
+                (it) =>
+                    dappPackages.some((dappPackage) => it.data?.type?.startsWith(dappPackage)) &&
+                    it.data?.type?.endsWith('ProfileOwnerCap'),
+            )
+            .map((it) => it.data?.content?.dataType === 'moveObject' && it.data?.content.fields.profile)
+    }
 
     const payload: TokenPayload = {
         publicKey,
@@ -207,11 +206,11 @@ export const requestEthLoginChallenge = (req: Request, res: Response) => {
         return
     }
     const nonce = randomBytes(8).toString('hex')
-
+    const statement = signMessage.join(' ')
     const payload: LoginChallengeTokenEth = {
         attemptPublicKey: publicKey,
         nonce,
-        statement: signMessage.join('\r\n'),
+        statement,
     }
 
     const jwt = jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
@@ -220,7 +219,7 @@ export const requestEthLoginChallenge = (req: Request, res: Response) => {
 
     res.status(200).json({
         jwt,
-        statement: signMessage.join('\r\n'),
+        statement,
         nonce,
     })
 }
@@ -231,7 +230,7 @@ export const submitEthLoginChallenge = async (req: Request, res: Response) => {
         return
     }
     const reqJwt = req.headers['authorization']
-    const signature = req.body.data.signature
+    const { signature, uri, domain, version, chainId, issuedAt } = req.body.data
 
     if (reqJwt == null) {
         res.status(400).send('Missing authorization header').end()
@@ -250,7 +249,16 @@ export const submitEthLoginChallenge = async (req: Request, res: Response) => {
 
     const { attemptPublicKey: publicKey, nonce, statement } = decoded
 
-    const siweMessage = new SiweMessage({ nonce, address: publicKey, statement })
+    const siweMessage = new SiweMessage({
+        nonce,
+        address: publicKey,
+        statement,
+        uri,
+        domain,
+        version,
+        chainId,
+        issuedAt,
+    })
 
     const { success } = await siweMessage.verify({ signature })
 
