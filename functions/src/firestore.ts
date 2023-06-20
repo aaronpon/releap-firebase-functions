@@ -5,7 +5,7 @@ import { Response } from 'express'
 import { ProfileQuest, RequestContext, TwitterQuest } from './types'
 import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { isFollowed, isLiked, isReplyed, isRetweeted } from './twitter'
-import { sleep } from './utils'
+//import { sleep } from './utils'
 
 const db = admin.firestore()
 db.settings({ ignoreUndefinedProperties: true })
@@ -150,7 +150,8 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
 
 export const mintBadge = async (ctx: RequestContext, req: Request, res: Response) => {
     const { createdBadgeId, badgeId, minter, minterProfile } = req.body.data
-    const { profiles, provider, publicKey } = ctx
+    const { profiles } = ctx
+    //const { profiles, provider, publicKey } = ctx
     if (!profiles.includes(minterProfile)) {
         res.status(401).send("You don't own this profile").end()
         return
@@ -172,6 +173,7 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
 
     try {
         // sleep 2 sec, to wait RPC sync
+        /*
         await sleep(2000)
         const { data, error } = await provider.getObject({
             id: badgeId,
@@ -185,6 +187,7 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
             res.status(400).send('Incorrect data type').end()
             return
         }
+
         const isVaildOwner =
             typeof data.owner === 'object' && 'AddressOwner' in data.owner && data.owner?.AddressOwner === publicKey
 
@@ -192,6 +195,7 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
             res.status(400).send('Incorrect owner').end()
             return
         }
+        */
     } catch (err) {
         res.status(400).send('Fail to get badge from chain').end()
         return
