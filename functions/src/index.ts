@@ -26,6 +26,7 @@ import admin from 'firebase-admin'
 
 import * as firestore from './firestore'
 import * as oauth from './oauth'
+import { checkAddressOwnsProfileName } from './ethereum'
 
 export { taskCreated, flagsUpdated } from './task'
 
@@ -172,4 +173,9 @@ export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => 
             await updateLastScrape(profile.name, new Date().toISOString())
         }),
     )
+})
+
+export const checkEvmAddress = onRequest(async (req, res) => {
+    const isProfileOwner = await checkAddressOwnsProfileName(req.body.address, req.body.profileName)
+    res.status(200).json({ isProfileOwner })
 })
