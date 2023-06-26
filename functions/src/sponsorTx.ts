@@ -10,11 +10,12 @@ admin.initializeApp()
 import { RequestContext, TaskRequest, TaskResponse } from './types'
 import { obj2Arr, sleep } from './utils'
 import { getDoc, storeDoc } from './firestore'
+import { checkAddressOwnsProfileName } from './ethereum'
 
 globalThis.fetch = fetch as any
 
 export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { isEth, publicKey, provider, profileTable } = ctx
+    const { isEth, publicKey } = ctx
     const { profileName } = req.body.data
 
     const task: TaskRequest = {
@@ -23,28 +24,17 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
             payload: { profileName },
         },
     }
-    const { key } = await admin.database().ref('/tasks').push(task)
-    const result = await waitTask(key as string)
 
-    if (isEth) {
-        // store the eth wallet <-> profile mapping off-chain
-        await sleep(2000)
-        const df = await provider.getDynamicFieldObject({
-            parentId: profileTable,
-            name: { type: '0x1::string::String', value: profileName },
-        })
-
-        const profile = df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value
-
-        if (profile != null) {
-            const ethProfile = (await getDoc<{ ethAddress: string; profiles: string[] }>('ethProfile', publicKey)) ?? {
-                ethAddress: publicKey,
-                profiles: [],
-            }
-            ethProfile.profiles.push(profile)
-            await storeDoc('ethProfile', publicKey, ethProfile)
+    if (isEth && profileName) {
+        const ownsProfile = await checkAddressOwnsProfileName(publicKey, profileName)
+        if (!ownsProfile) {
+            res.status(401).send("You don't own this profile name on EVM Chain").end()
+            return
         }
     }
+
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
 
     res.status(201).json(result)
 }

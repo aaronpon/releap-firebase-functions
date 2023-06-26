@@ -183,6 +183,8 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
             .map((it) => it.data?.content?.dataType === 'moveObject' && it.data?.content.fields.profile)
     }
 
+    // Check profile names owned by eth wallet, find sui profile id by profile name
+
     const payload: TokenPayload = {
         publicKey,
         profiles,
