@@ -8,8 +8,7 @@ import admin from 'firebase-admin'
 admin.initializeApp()
 
 import { RequestContext, TaskRequest, TaskResponse } from './types'
-import { obj2Arr, sleep } from './utils'
-import { getDoc, storeDoc } from './firestore'
+import { obj2Arr } from './utils'
 import { checkAddressOwnsProfileName } from './ethereum'
 
 globalThis.fetch = fetch as any

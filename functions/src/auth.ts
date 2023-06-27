@@ -6,6 +6,7 @@ import { Connection, fromSerializedSignature, IntentScope, JsonRpcProvider, veri
 import { LoginChallengeToken, LoginChallengeTokenEth, RequestContext, TokenPayload } from './types'
 import { getAllOwnedObjects, RPC } from './utils'
 import { SiweMessage } from 'siwe'
+import { getFirstProfileName } from './ethereum'
 
 const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
 
@@ -183,7 +184,16 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
             .map((it) => it.data?.content?.dataType === 'moveObject' && it.data?.content.fields.profile)
     }
 
-    // Check profile names owned by eth wallet, find sui profile id by profile name
+    const profileName: string | null = await getFirstProfileName(publicKey)
+
+    if (profileName) {
+        const df = await provider.getDynamicFieldObject({
+            parentId: process.env.PROFILE_TABLE as string,
+            name: { type: '0x1::string::String', value: profileName },
+        })
+        const profile = df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value
+        profiles.push(profile)
+    }
 
     const payload: TokenPayload = {
         publicKey,
