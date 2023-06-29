@@ -153,6 +153,19 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
     res.status(201).end()
 }
 
+export const updateLastActivity = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profileId } = req.body.data
+    const { profiles } = ctx
+    if (!profiles.includes(profileId)) {
+        res.status(401).send("You don't own this profile").end()
+        return
+    }
+
+    await db.collection('users').doc(profileId).update({ lastActivity: Timestamp.now() })
+
+    res.status(201).end()
+}
+
 export const mintBadge = async (ctx: RequestContext, req: Request, res: Response) => {
     const { createdBadgeId, badgeId, minter, minterProfile } = req.body.data
     const { profiles } = ctx

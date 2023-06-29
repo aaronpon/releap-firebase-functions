@@ -105,6 +105,9 @@ export const entrypoint = onRequest(
             case 'fireStoreCreateBadgeMint':
                 applyJwtValidation(firestore.createBadgeMint)(req, res)
                 break
+            case 'fireStoreupdateLastViewedActivity':
+                applyJwtValidation(firestore.updateLastActivity)(req, res)
+                break
             case 'badgeMintEligibility':
                 applyJwtValidation(firestore.badgeMintEligibility)(req, res)
                 break

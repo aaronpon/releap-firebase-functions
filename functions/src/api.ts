@@ -3,11 +3,11 @@ import { ApifyTwitterRes } from './types'
 
 // Initialize the ApifyClient with API token
 const client = new ApifyClient({
-    token: 'apify_api_hGr4XrNcBxsY5mLd2kluTCr8TW8GAA3NdFbI',
+    token: 'apify_api_kkOyeZBCaxZIQL89Odagqmw55O98io0GOs00',
 })
 
 export const scrapeProfile = async (twitterProfileName: string): Promise<ApifyTwitterRes[]> => {
-    const task = client.task('inalienable_pony/twitter-scraper-task')
+    const task = client.task('guiltless_shrub/twitter-scraper')
 
     const run = await task.call({
         addUserInfo: false,

@@ -8,7 +8,7 @@ import admin from 'firebase-admin'
 admin.initializeApp()
 
 import { RequestContext, TaskRequest, TaskResponse } from './types'
-import { obj2Arr } from './utils'
+import { obj2Arr, sleep } from './utils'
 import { checkAddressOwnsProfileName } from './ethereum'
 
 globalThis.fetch = fetch as any
@@ -23,12 +23,23 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
             payload: { profileName },
         },
     }
+    let shouldWait = true
+    let waitedCount = 0
+    let ownsProfile = false
 
     if (isEth && profileName) {
-        const ownsProfile = await checkAddressOwnsProfileName(publicKey, profileName)
         if (!ownsProfile) {
-            res.status(401).send("You don't own this profile name on EVM Chain").end()
-            return
+            while (shouldWait) {
+                await sleep(waitedCount * 2000)
+                ownsProfile = await checkAddressOwnsProfileName(publicKey, profileName)
+                if (waitedCount > 5) {
+                    shouldWait = false
+                    res.status(401).send("You don't own this profile name on EVM Chain").end()
+                } else if (ownsProfile) {
+                    shouldWait = false
+                }
+                waitedCount++
+            }
         }
     }
 
