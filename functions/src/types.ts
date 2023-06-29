@@ -5,27 +5,38 @@ export interface LoginChallengeToken {
     signData: string
 }
 
+export interface LoginChallengeTokenEth {
+    attemptPublicKey: string
+    statement: string
+    nonce: string
+}
+
 export interface TokenPayload {
     publicKey: string
     profiles: string[]
+    isEth: boolean
 }
 
 export interface AppContext {
     publicKey: string
     profiles: string[]
+    isEth: boolean
     provider: JsonRpcProvider
     signer: RawSigner
     // env
     dappPackages: string[]
     recentPosts: string
+    index: string
+    profileTable: string
     adminCap: string
 }
 
-export type ShareContext = Omit<AppContext, 'publicKey' | 'profiles'>
-export type RequestContext = Omit<AppContext, 'provider' | 'signer'>
+export type ShareContext = Omit<AppContext, 'publicKey' | 'profiles' | 'isEth'>
+export type RequestContext = Omit<AppContext, 'signer'>
 
 export interface TaskRequest {
     data:
+        | { action: 'createProfile'; payload: { profileName: string } }
         | {
               action: 'createPost'
               payload: { profile: string; content: string; imageUrl: string }
