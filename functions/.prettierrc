@@ -6,5 +6,6 @@
   "useTabs": false,
   "printWidth": 120,
   "importOrder": ["^@", "^~/(.*)$", "^[.]"],
-  "importOrderSeparation": true
+  "importOrderSeparation": true,
+  "endOfLine":"auto"
 }
