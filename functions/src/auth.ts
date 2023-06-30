@@ -202,7 +202,7 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
     }
 
     return jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
-        expiresIn: process.env.JWT_EXPIRES_IN ?? '24h',
+        expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
     })
 }
 
