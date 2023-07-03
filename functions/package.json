@@ -27,7 +27,8 @@
         "node-fetch": "2",
         "oauth-1.0a": "^2.2.6",
         "siwe": "^2.1.4",
-        "viem": "^1.1.0"
+        "viem": "^1.1.0",
+        "zod": "^3.21.4"
     },
     "devDependencies": {
         "@types/node-fetch": "^2.6.4",

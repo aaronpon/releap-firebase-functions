@@ -125,6 +125,12 @@ export const entrypoint = onRequest(
             case 'disconnectTwitter':
                 applyJwtValidation(oauth.disconnectTwitter)(req, res)
                 break
+            case 'submitQuest':
+                applyJwtValidation(firestore.submitQuest)(req, res)
+                break
+            case 'updateQuestSubmission':
+                applyJwtValidation(firestore.updateQuestSubmission)(req, res)
+                break
             default:
                 res.status(400).send('Unexpected action').end()
         }
