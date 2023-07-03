@@ -2,7 +2,7 @@ import admin from 'firebase-admin'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 
-import { ProfileQuest, RequestContext, SuiQuest, TwitterQuest } from './types'
+import { ProfileQuest, RequestContext, SuiQuest, TwitterQuest, User } from './types'
 import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { isFollowed, isLiked, isReplyed, isRetweeted } from './twitter'
 //import { sleep } from './utils'
@@ -379,4 +379,9 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
     }
 
     res.json({ eligible: twitterCompleted && suiCompleted }).end()
+}
+
+export const isProfileEVMOnly = async (profileName: string): Promise<boolean> => {
+    const firestoreUser: User = await getDoc('users', profileName)
+    return firestoreUser.isEVM ?? false
 }

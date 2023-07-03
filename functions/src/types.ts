@@ -1,4 +1,5 @@
 import { JsonRpcProvider, RawSigner, SuiTransactionBlockResponse } from '@mysten/sui.js'
+import { Timestamp } from 'firebase-admin/firestore'
 
 export interface LoginChallengeToken {
     attemptPublicKey: string
@@ -132,4 +133,11 @@ export interface ProfileQuest {
     follow: boolean
     reply: boolean
     retweet: boolean
+}
+
+export interface User {
+    isEVM: boolean
+    lastActivity: Timestamp
+    name: string
+    profileId: string
 }
