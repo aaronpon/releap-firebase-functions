@@ -2,7 +2,7 @@ import admin from 'firebase-admin'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 
-import { ProfileQuest, RequestContext, SuiQuest, TwitterQuest, User } from './types'
+import { ProfileQuest, RequestContext, SuiQuest, TwitterQuest } from './types'
 import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { isFollowed, isLiked, isReplyed, isRetweeted } from './twitter'
 //import { sleep } from './utils'
@@ -38,6 +38,12 @@ export const updateUserTwitterData = async (
     return await ref.update({ twitterId, twitterHandle })
 }
 
+export const isProfileEVMOnly = async (profileName: string): Promise<boolean> => {
+    const ref = db.collection('users').where('name', '==', profileName).limit(1)
+    const firestoreUser: any = (await ref.get()).docs[0].data()
+    console.log('IS PROFILE EVM ONLY: ', firestoreUser)
+    return firestoreUser?.isEVM ?? false
+}
 /*
  * Events schema
  * -----------
@@ -379,9 +385,4 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
     }
 
     res.json({ eligible: twitterCompleted && suiCompleted }).end()
-}
-
-export const isProfileEVMOnly = async (profileName: string): Promise<boolean> => {
-    const firestoreUser: User = await getDoc('users', profileName)
-    return firestoreUser.isEVM ?? false
 }
