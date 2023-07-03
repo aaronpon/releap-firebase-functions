@@ -1,6 +1,10 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { pubsub } from 'firebase-functions'
 import * as logger from 'firebase-functions/logger'
+
+import admin from 'firebase-admin'
+
+admin.initializeApp()
 import {
     extendToken,
     applyJwtValidation,
@@ -22,7 +26,6 @@ import {
 import { getTwitterScraperProfiles, updateLastScrap as updateLastScrape } from './firestore'
 import { scrapeProfile as scrapeTweets } from './api'
 import { ApifyTwitterRes } from './types'
-import admin from 'firebase-admin'
 
 import * as firestore from './firestore'
 import * as oauth from './oauth'
