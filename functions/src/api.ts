@@ -262,7 +262,7 @@ export const scrapeProfile = async (twitterProfileName: string): Promise<ApifyTw
         repliesDepth: 1,
         searchMode: 'live',
         skipRetweets: true,
-        tweetsDesired: 4,
+        tweetsDesired: 2,
         useAdvancedSearch: false,
     })
 

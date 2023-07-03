@@ -8,8 +8,9 @@ import admin from 'firebase-admin'
 admin.initializeApp()
 
 import { RequestContext, TaskRequest, TaskResponse } from './types'
-import { obj2Arr, sleep } from './utils'
+import { RPC, obj2Arr, sleep } from './utils'
 import { checkAddressOwnsProfileName } from './ethereum'
+import { JsonRpcProvider, Connection } from '@mysten/sui.js'
 
 globalThis.fetch = fetch as any
 
@@ -26,6 +27,18 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     let shouldWait = true
     let waitedCount = 0
     let ownsProfile = false
+
+    const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
+
+    const df = await provider.getDynamicFieldObject({
+        parentId: process.env.PROFILE_TABLE as string,
+        name: { type: '0x1::string::String', value: profileName },
+    })
+    const profile = (df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value) ?? ''
+
+    if (profile) {
+        res.status(401).send('Profile Exists on Sui').end()
+    }
 
     if (isEth && profileName) {
         if (!ownsProfile) {

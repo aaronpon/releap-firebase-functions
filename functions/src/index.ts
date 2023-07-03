@@ -33,6 +33,7 @@ export const entrypoint = onRequest(
     {
         secrets: ['JWT_SECRET', 'TWITTER_COMSUMER_SECRET', 'TWITTER_BEARER_TOKEN', 'SCRAPER_API_TOKEN'],
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
+        minInstances: 1,
     },
     async (req, res) => {
         if (req.method === 'OPTIONS') {
@@ -140,7 +141,7 @@ export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => 
             await Promise.all(
                 response.map(async (tweet) => {
                     if (new Date(tweet.created_at) > new Date(lastUpdate)) {
-                        logger.info(`Got Tweet profiles: ${profile.twitter}, ${tweet.full_text}`)
+                        logger.info(`Got Tweet: ${profile.twitter}, ${tweet.full_text}`)
 
                         const mediaUrl =
                             tweet.media.length > 0
