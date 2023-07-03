@@ -250,7 +250,7 @@ export const submitEthLoginChallenge = async (req: Request, res: Response) => {
     }
 
     if (signature == null) {
-        res.status(400).send('Missing singature').end()
+        res.status(400).send('Missing signature').end()
         return
     }
 

@@ -48,9 +48,9 @@ export const updateUserTwitterData = async (
  * postId: comment
  */
 export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { name, profileId } = req.body.data
+    const { name, profileId, isEVM } = req.body.data
 
-    await storeDoc('users', profileId, { name, profileId })
+    await storeDoc('users', profileId, { name, profileId, isEVM })
 
     res.status(201).end()
 }
