@@ -15,7 +15,7 @@
     },
     "main": "lib/index.js",
     "dependencies": {
-        "@mysten/sui.js": "^0.34.1",
+        "@mysten/sui.js": "^0.36.0",
         "apify-client": "^2.7.1",
         "axios": "^1.4.0",
         "eslint-config-prettier": "^8.8.0",
