@@ -2,7 +2,7 @@ import admin from 'firebase-admin'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 
-import { ProfileQuest, RequestContext, TwitterQuest } from './types'
+import { ProfileQuest, RequestContext, SuiQuest, TwitterQuest } from './types'
 import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { isFollowed, isLiked, isReplyed, isRetweeted } from './twitter'
 //import { sleep } from './utils'
@@ -239,8 +239,19 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
 }
 
 export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { badgeId, name, description, maxSupply, imageUrl, profileId, mintList, order, twitterQuest, point } =
-        req.body.data
+    const {
+        badgeId,
+        name,
+        description,
+        maxSupply,
+        imageUrl,
+        profileId,
+        mintList,
+        order,
+        twitterQuest,
+        point,
+        suiQuest,
+    } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         res.status(401).send("You don't own this profile").end()
@@ -267,6 +278,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         point: point ?? 0,
         timeStamp,
         twitterQuest,
+        suiQuest,
     })
 
     res.status(201).end()
@@ -274,7 +286,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
 
 export const badgeMintEligibility = async (ctx: RequestContext, req: Request, res: Response) => {
     const { badgeId, profileId } = req.body.data
-    const { profiles } = ctx
+    const { profiles, publicKey, provider } = ctx
     if (!profiles.includes(profileId)) {
         res.status(401).send("You don't own this profile").end()
         return
@@ -292,10 +304,42 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
         return
     }
 
-    const { twitterQuest }: { twitterQuest?: TwitterQuest } =
+    const { twitterQuest, suiQuest }: { twitterQuest?: TwitterQuest; suiQuest?: SuiQuest } =
         (await db.collection('badgeId').doc(badgeId).get()).data() ?? {}
 
-    let eligible = false
+    let suiCompleted = false
+    if (suiQuest != null) {
+        if (suiQuest.event != null) {
+            let cursor = null
+            let count = 0
+            let hasNext = true
+
+            // Maxium search 250 events
+            while (count < 5 && hasNext) {
+                const result = await provider.queryEvents({
+                    // cannot use `All` or `And` event filter
+                    query: { Sender: publicKey },
+                    limit: 50,
+                    order: 'descending',
+                    cursor,
+                })
+
+                cursor = result.nextCursor
+                hasNext = result.hasNextPage
+
+                if (result.data.some((it) => it.type === suiQuest.event)) {
+                    suiCompleted = true
+                    break
+                }
+
+                count = count + 1
+            }
+        }
+    } else {
+        suiCompleted = true
+    }
+
+    let twitterCompleted = false
     if (twitterQuest != null) {
         const { like, follow, reply, retweet }: ProfileQuest = ((await getDoc(
             'profileBadgeQuests',
@@ -303,7 +347,7 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
         )) ?? { like: false, follow: false, reply: false, retweet: false }) as ProfileQuest
 
         // make as completed if not require
-        const profileQuestAfterCheck: ProfileQuest = {
+        const afterCheck: ProfileQuest = {
             like: twitterQuest.like == null || like,
             follow: twitterQuest.follow == null || follow,
             reply: twitterQuest.reply == null || reply,
@@ -313,34 +357,26 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
         // require and not completed
         if (twitterQuest.like != null && !like) {
             const result = await isLiked(profile.twitterId, twitterQuest.like)
-            profileQuestAfterCheck.like = result
+            afterCheck.like = result
         }
         if (twitterQuest.follow != null && !follow) {
             const result = await isFollowed(profile.twitterId, twitterQuest.follow)
-            profileQuestAfterCheck.follow = result
+            afterCheck.follow = result
         }
         if (twitterQuest.reply != null && !reply) {
             const result = await isReplyed(profile.twitterId, twitterQuest.reply)
-            profileQuestAfterCheck.reply = result
+            afterCheck.reply = result
         }
         if (twitterQuest.retweet != null && !retweet) {
             const result = await isRetweeted(profile.twitterId, twitterQuest.retweet)
-            profileQuestAfterCheck.retweet = result
+            afterCheck.retweet = result
         }
 
-        await db.collection('profileBadgeQuests').doc(`${badgeId}.${profileId}`).set(profileQuestAfterCheck)
-        if (
-            profileQuestAfterCheck.like &&
-            profileQuestAfterCheck.follow &&
-            profileQuestAfterCheck.reply &&
-            profileQuestAfterCheck.retweet
-        ) {
-            eligible = true
-        } else {
-            eligible = false
-        }
+        await db.collection('profileBadgeQuests').doc(`${badgeId}.${profileId}`).set(afterCheck)
+        twitterCompleted = afterCheck.like && afterCheck.follow && afterCheck.reply && afterCheck.retweet
     } else {
-        eligible = true
+        twitterCompleted = true
     }
-    res.json({ eligible }).end()
+
+    res.json({ eligible: twitterCompleted && suiCompleted }).end()
 }

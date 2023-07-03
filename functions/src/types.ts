@@ -123,6 +123,10 @@ export interface TwitterQuest {
     retweet: string | undefined
 }
 
+export interface SuiQuest {
+    event: string | undefined
+}
+
 export interface ProfileQuest {
     like: boolean
     follow: boolean
