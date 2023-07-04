@@ -72,18 +72,18 @@ export async function isReplyed(userId: string, tweetId: string): Promise<boolea
 }
 
 export async function isRetweeted(userId: string, tweetId: string): Promise<boolean> {
-    const token = getScraperAPIToken()
-    try {
-        const { data } = await axios.get<{ tweets: { retweeted_tweet?: { tweet_id: string } }[] }>(
-            `https://api.scraperapi.com/structured/twitter/v2/tweets?api_key=${token}&user_id=${userId}`,
-            {
-                headers: { Authorization: token },
-            },
-        )
-
-        return data.tweets.some((it) => it.retweeted_tweet?.tweet_id === tweetId)
-    } catch (err) {
-        logger.error('Fail to get isReplyed', err)
-        return false
-    }
+    // const token = getScraperAPIToken()
+    // try {
+    //     const { data } = await axios.get<{ tweets: { retweeted_tweet?: { tweet_id: string } }[] }>(
+    //         `https://api.scraperapi.com/structured/twitter/v2/tweets?api_key=${token}&user_id=${userId}`,
+    //         {
+    //             headers: { Authorization: token },
+    //         },
+    //     )
+    //     return data.tweets.some((it) => it.retweeted_tweet?.tweet_id === tweetId)
+    // } catch (err) {
+    //     logger.error('Fail to get isReplyed', err)
+    //     return false
+    // }
+    return true
 }
