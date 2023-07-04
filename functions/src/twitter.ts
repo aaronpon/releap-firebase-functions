@@ -1,5 +1,5 @@
-import axios from 'axios'
-import { logger } from 'firebase-functions/v1'
+// import axios from 'axios'
+// import { logger } from 'firebase-functions/v1'
 
 /*
 function getTwitterBearerToken() {
@@ -7,9 +7,9 @@ function getTwitterBearerToken() {
 }
 */
 
-function getScraperAPIToken() {
-    return process.env.SCRAPER_API_TOKEN
-}
+// function getScraperAPIToken() {
+//     return process.env.SCRAPER_API_TOKEN
+// }
 
 export async function isLiked(userId: string, tweetId: string): Promise<boolean> {
     return true

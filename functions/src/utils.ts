@@ -1,6 +1,6 @@
 import { JsonRpcProvider, PaginatedObjectsResponse } from '@mysten/sui.js'
 
-export const RPC = 'https://sui-mainnet-rpc.nodereal.io'
+export const RPC = process.env.SUI_RPC ?? 'https://fullnode.mainnet.sui.io:443'
 export const TX_WINDOW = 500
 export async function getAllOwnedObjects(provider: JsonRpcProvider, address: string) {
     const data: PaginatedObjectsResponse['data'] = []
