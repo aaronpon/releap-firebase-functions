@@ -131,7 +131,7 @@ export const entrypoint = onRequest(
     },
 )
 
-export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => {
+export const twitterPosting = pubsub.schedule('*/15 * * * *').onRun(async () => {
     const profilesToScrap = await getTwitterScraperProfiles()
     await Promise.all(
         profilesToScrap.map(async (profile) => {
@@ -172,11 +172,11 @@ export const twitterPosting = pubsub.schedule('*/20 * * * *').onRun(async () => 
                             timeStamp: admin.firestore.FieldValue.serverTimestamp(),
                             profileId: profile.profileId,
                         })
+
+                        await updateLastScrape(profile.name, new Date().toISOString())
                     }
                 }),
             )
-
-            await updateLastScrape(profile.name, new Date().toISOString())
         }),
     )
 })
