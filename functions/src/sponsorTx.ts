@@ -5,7 +5,6 @@ import { Response } from 'express'
 
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 import admin from 'firebase-admin'
-admin.initializeApp()
 
 import { RequestContext, TaskRequest, TaskResponse } from './types'
 import { RPC, obj2Arr, sleep } from './utils'
