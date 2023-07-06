@@ -6,49 +6,25 @@ import {
     SuiTransactionBlockResponse,
     SUI_CLOCK_OBJECT_ID,
     TransactionBlock,
+    SuiObjectRef,
+    MIST_PER_SUI,
 } from '@mysten/sui.js'
-import { onValueCreated, onValueWritten } from 'firebase-functions/v2/database'
+import { onValueCreated } from 'firebase-functions/v2/database'
 import * as logger from 'firebase-functions/logger'
-import { Flags, ShareContext, TaskRequest } from './types'
-import { obj2Arr, RPC, sleep, TX_WINDOW } from './utils'
+import { ShareContext, TaskRequest } from './types'
+import { GAS_AMOUNT, GAS_COUNT, RPC, retry } from './utils'
 
 import admin from 'firebase-admin'
+import { db } from './firestore'
 
-export const taskCreated = onValueCreated('/tasks/{taskId}', async (event) => {
-    await admin.database().ref('/flags/shared/lastRequest').set(event.params.taskId)
-})
-
-export const flagsUpdated = onValueWritten(
+export const taskCreated = onValueCreated(
     {
-        ref: '/flags/shared',
+        ref: '/tasks/{taskId}',
         secrets: ['SEED_PHRASE'],
     },
     async (event) => {
-        let after = obj2Arr(event.data.after.toJSON()) as unknown as Flags
-
-        if (after.locked === true || after.lastProcessedRequests?.includes(after.lastRequest ?? '')) {
-            return
-        }
-        await admin.database().ref('/flags/shared/locked').set(true)
-
-        let shouldWait = true
-        let waitedCount = 0
-
-        while (shouldWait) {
-            await sleep(TX_WINDOW)
-            const last = (await admin.database().ref('/flags/shared').get()).toJSON() as unknown as Flags
-            if (waitedCount > 5 || last.lastRequest === after.lastRequest) {
-                shouldWait = false
-            } else {
-                after = last
-            }
-            waitedCount++
-        }
-        const tasks = (await admin.database().ref('/tasks').get()).toJSON() as Record<string, TaskRequest>
-        if (tasks == null || Object.keys(tasks).length === 0) {
-            await admin.database().ref('/flags/shared/locked').set(false)
-            return
-        }
+        const taskId = event.params.taskId
+        const task = event.data.toJSON() as unknown as TaskRequest
 
         const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
         const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
@@ -64,24 +40,113 @@ export const flagsUpdated = onValueWritten(
         }
 
         try {
-            const { digest, effects, events } = await tasksRunner(shareCtx, Object.values(tasks))
-            for (const key in tasks) {
-                await admin.database().ref(`/tasks_res/${key}`).set({ digest, effects, events })
+            const { digest, effects, events } = await retry(async () => await tasksRunner(shareCtx, [task]), {
+                retryCount: 2,
+                retryDelayMs: 0,
+            })
+            await admin.database().ref(`/tasks_res/${taskId}`).set({ digest, effects, events })
+        } catch (error) {
+            if (error instanceof Error) {
+                await admin.database().ref(`/tasks_res/${taskId}`).set({ error: error.message })
             }
-        } catch (err) {
-            logger.error(err)
+            logger.error(error)
         } finally {
-            for (const key in tasks) {
-                await admin.database().ref(`/tasks/${key}`).remove()
-            }
-            await admin.database().ref('/flags/shared/lastProcessedRequests').set(Object.keys(tasks))
-            await admin.database().ref('/flags/shared/locked').set(false)
+            await admin.database().ref(`/tasks/${taskId}`).remove()
         }
     },
 )
 
-async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Promise<SuiTransactionBlockResponse> {
-    const { signer, dappPackages, adminCap, recentPosts, index } = ctx
+export async function getGasCount(): Promise<number> {
+    const result = await db.collection('gas').count().get()
+    return result.data().count
+}
+
+export async function borrowGas(): Promise<SuiObjectRef | null> {
+    const ref = db.collection('gas').orderBy('lastUsed').limit(1)
+    return await db.runTransaction(
+        async (tx) => {
+            const docs = (await tx.get(ref)).docs
+            if (docs.length > 0) {
+                const coin = docs[0].data() as SuiObjectRef
+                const refToDelete = db.collection('gas').doc(coin.objectId)
+                tx.delete(refToDelete)
+                return coin
+            } else {
+                return null
+            }
+        },
+        { maxAttempts: 100 },
+    )
+}
+
+export async function returnGas(coin: SuiObjectRef) {
+    await db.runTransaction(async (tx) => {
+        const ref = db.collection('gas').doc(coin.objectId)
+        tx.set(ref, { ...coin, lastUsed: Date.now() })
+    })
+}
+
+export async function rebalanceGas(ignoreGasCheck = false) {
+    if (!ignoreGasCheck) {
+        const count = await getGasCount()
+
+        if (count > GAS_COUNT / 2) {
+            return
+        }
+    }
+    const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
+    const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
+    const signer = new RawSigner(keypair, provider)
+    const publicKey = keypair.getPublicKey().toSuiAddress()
+
+    const tx = new TransactionBlock()
+    const amounts = Array(GAS_COUNT).fill(tx.pure(GAS_AMOUNT * Number(MIST_PER_SUI)))
+    const splitCoins = tx.splitCoins(tx.gas, amounts)
+    const array = amounts.map((_, idx) => splitCoins[idx])
+
+    tx.transferObjects(array, tx.pure(publicKey))
+
+    const result = await signer.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        options: { showObjectChanges: true },
+    })
+
+    const coins: SuiObjectRef[] = (result.objectChanges ?? []).filter((it) => it.type === 'created') as SuiObjectRef[]
+
+    await db.runTransaction(async (tx) => {
+        const delDocRefs = db.collection('gas')
+        const delDocs = await tx.get(delDocRefs)
+        // remove the old gas, as the objectId will change after rebalance
+        for (const delDoc of delDocs.docs) {
+            tx.delete(delDoc.ref)
+        }
+        coins.forEach((coin) => {
+            const ref = db.collection('gas').doc(coin.objectId)
+            tx.set(ref, { ...coin, lastUsed: Date.now() })
+        })
+    })
+}
+
+export async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Promise<SuiTransactionBlockResponse> {
+    const { signer, dappPackages, adminCap, index } = ctx
+    const txBlock = new TransactionBlock()
+
+    const gas = await retry(
+        async () => {
+            const gas = await borrowGas()
+            if (gas == null) {
+                throw new Error('Server busy, no gas coin avaliable')
+            }
+            return gas
+        },
+        {
+            retryCount: 10,
+            retryDelayMs: 500,
+        },
+    )
+
+    txBlock.setGasPayment([gas])
+
     const tx = tasks.reduce((tx, curr) => {
         switch (curr.data.action) {
             case 'createProfile':
@@ -97,11 +162,9 @@ async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Promise<Sui
                 break
             case 'createPost':
                 tx.moveCall({
-                    target: `${dappPackages[0]}::releap_social::create_post_with_admin_cap`,
+                    target: `${dappPackages[0]}::releap_social::create_post_delegated`,
                     arguments: [
                         tx.object(curr.data.payload.profile),
-                        tx.object(adminCap),
-                        tx.object(recentPosts),
                         tx.pure(curr.data.payload.imageUrl),
                         tx.pure(curr.data.payload.content),
                         tx.object(SUI_CLOCK_OBJECT_ID),
@@ -110,12 +173,10 @@ async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Promise<Sui
                 break
             case 'createComment':
                 tx.moveCall({
-                    target: `${dappPackages[0]}::releap_social::create_comment_with_admin_cap`,
+                    target: `${dappPackages[0]}::releap_social::create_comment_delegated`,
                     arguments: [
                         tx.object(curr.data.payload.post),
                         tx.object(curr.data.payload.profile),
-                        tx.object(adminCap),
-                        tx.object(recentPosts),
                         tx.pure(curr.data.payload.content),
                         tx.object(SUI_CLOCK_OBJECT_ID),
                     ],
@@ -123,54 +184,46 @@ async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Promise<Sui
                 break
             case 'likePost':
                 tx.moveCall({
-                    target: `${dappPackages[0]}::releap_social::like_post_with_admin_cap`,
+                    target: `${dappPackages[0]}::releap_social::like_post_delegated`,
                     typeArguments: [],
-                    arguments: [
-                        tx.object(curr.data.payload.post),
-                        tx.object(curr.data.payload.profile),
-                        tx.object(adminCap),
-                    ],
+                    arguments: [tx.object(curr.data.payload.post), tx.object(curr.data.payload.profile)],
                 })
                 break
             case 'unlikePost':
                 tx.moveCall({
-                    target: `${dappPackages[0]}::releap_social::unlike_post_with_admin_cap`,
+                    target: `${dappPackages[0]}::releap_social::unlike_post_delegated`,
                     typeArguments: [],
-                    arguments: [
-                        tx.object(curr.data.payload.post),
-                        tx.object(curr.data.payload.profile),
-                        tx.object(adminCap),
-                    ],
+                    arguments: [tx.object(curr.data.payload.post), tx.object(curr.data.payload.profile)],
                 })
                 break
             case 'followProfile':
                 tx.moveCall({
-                    target: `${dappPackages[0]}::releap_social::follow_with_admin_cap`,
+                    target: `${dappPackages[0]}::releap_social::follow_delegated`,
                     typeArguments: [],
-                    arguments: [
-                        tx.object(curr.data.payload.followingProfile),
-                        tx.object(curr.data.payload.profile),
-                        tx.object(adminCap),
-                    ],
+                    arguments: [tx.object(curr.data.payload.followingProfile), tx.object(curr.data.payload.profile)],
                 })
                 break
             case 'unfollowProfile':
                 tx.moveCall({
-                    target: `${dappPackages[0]}::releap_social::unfollow_with_admin_cap`,
+                    target: `${dappPackages[0]}::releap_social::unfollow_delegated`,
                     typeArguments: [],
-                    arguments: [
-                        tx.object(curr.data.payload.followingProfile),
-                        tx.object(curr.data.payload.profile),
-                        tx.object(adminCap),
-                    ],
+                    arguments: [tx.object(curr.data.payload.followingProfile), tx.object(curr.data.payload.profile)],
                 })
                 break
         }
         return tx
-    }, new TransactionBlock())
+    }, txBlock)
 
-    return await signer.signAndExecuteTransactionBlock({
+    const result = await signer.signAndExecuteTransactionBlock({
         transactionBlock: tx,
         options: { showEvents: true, showEffects: true },
     })
+
+    const usedGas = result.effects?.gasObject.reference
+
+    if (usedGas) {
+        await returnGas(usedGas)
+    }
+
+    return result
 }

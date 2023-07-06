@@ -28,7 +28,6 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     let ownsProfile = false
 
     const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
-
     const df = await provider.getDynamicFieldObject({
         parentId: process.env.PROFILE_TABLE as string,
         name: { type: '0x1::string::String', value: profileName },
@@ -202,7 +201,7 @@ export const unfollowProfile = async (ctx: RequestContext, req: Request, res: Re
     res.status(201).json(result)
 }
 
-async function waitTask(taskId: string) {
+export async function waitTask(taskId: string) {
     while (true) {
         const taskRes = await admin.database().ref(`/tasks_res/${taskId}`).once('value')
         const json = taskRes.toJSON() as unknown as TaskResponse | undefined

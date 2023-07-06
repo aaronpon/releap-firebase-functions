@@ -10,7 +10,7 @@ import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
 import { assignRole } from './discord'
 
-const db = admin.firestore()
+export const db = admin.firestore()
 db.settings({ ignoreUndefinedProperties: true })
 
 export const getTwitterScraperProfiles = async () => {
