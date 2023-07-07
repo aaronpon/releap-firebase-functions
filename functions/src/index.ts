@@ -141,6 +141,8 @@ export const twitterPosting = pubsub.schedule('*/15 * * * *').onRun(async () => 
 
             const response: ApifyTwitterRes[] = await scrapeTweets(profile.twitter)
 
+            await updateLastScrape(profile.name, new Date().toISOString())
+
             await Promise.all(
                 response.map(async (tweet) => {
                     if (new Date(tweet.created_at) > new Date(lastUpdate)) {
@@ -172,8 +174,6 @@ export const twitterPosting = pubsub.schedule('*/15 * * * *').onRun(async () => 
                             timeStamp: admin.firestore.FieldValue.serverTimestamp(),
                             profileId: profile.profileId,
                         })
-
-                        await updateLastScrape(profile.name, new Date().toISOString())
                     }
                 }),
             )
