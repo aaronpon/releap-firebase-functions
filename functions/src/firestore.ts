@@ -256,7 +256,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         order,
         twitterQuest,
         point,
-        suiQuest,
+        suiQuests,
     } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
@@ -284,7 +284,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         point: point ?? 0,
         timeStamp,
         twitterQuest,
-        suiQuest,
+        suiQuests,
     })
 
     res.status(201).end()
@@ -310,35 +310,43 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
         return
     }
 
-    const { twitterQuest, suiQuest }: { twitterQuest?: TwitterQuest; suiQuest?: SuiQuest } =
+    const { twitterQuest, suiQuests }: { twitterQuest?: TwitterQuest; suiQuests?: SuiQuest[] } =
         (await db.collection('badgeId').doc(badgeId).get()).data() ?? {}
 
     let suiCompleted = false
-    if (suiQuest != null) {
-        if (suiQuest.event != null) {
-            let cursor = null
-            let count = 0
-            let hasNext = true
+    if (suiQuests != null) {
+        suiCompleted = true
+        for (const suiQuest of suiQuests) {
+            let completed = false
+            if (suiQuest.event != null) {
+                let cursor = null
+                let count = 0
+                let hasNext = true
 
-            // Maxium search 250 events
-            while (count < 5 && hasNext) {
-                const result = await provider.queryEvents({
-                    // cannot use `All` or `And` event filter
-                    query: { Sender: publicKey },
-                    limit: 50,
-                    order: 'descending',
-                    cursor,
-                })
+                // Maxium search 250 events
+                while (count < 5 && hasNext) {
+                    const result = await provider.queryEvents({
+                        // cannot use `All` or `And` event filter
+                        query: { Sender: publicKey },
+                        limit: 50,
+                        order: 'descending',
+                        cursor,
+                    })
 
-                cursor = result.nextCursor
-                hasNext = result.hasNextPage
+                    cursor = result.nextCursor
+                    hasNext = result.hasNextPage
 
-                if (result.data.some((it) => it.type === suiQuest.event)) {
-                    suiCompleted = true
-                    break
+                    if (result.data.some((it) => it.type === suiQuest.event)) {
+                        completed = true
+                        break
+                    }
+
+                    count = count + 1
                 }
-
-                count = count + 1
+            }
+            if (!completed) {
+                suiCompleted = false
+                break
             }
         }
     } else {
