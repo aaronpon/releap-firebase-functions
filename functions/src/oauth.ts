@@ -4,7 +4,7 @@ import { Response } from 'express'
 import { createHmac } from 'crypto'
 import axios from 'axios'
 import * as logger from 'firebase-functions/logger'
-import { updateUserTwitterData } from './firestore'
+import { updateUserDiscordData, updateUserTwitterData } from './firestore'
 import { RequestContext } from './types'
 
 async function requestTwitterAccessToken({ oauthToken, oauthVerifier }: { oauthToken: string; oauthVerifier: string }) {
@@ -131,4 +131,51 @@ export async function disconnectTwitter(ctx: RequestContext, req: Request, res: 
     }
     await updateUserTwitterData(profile, null, null)
     res.status(200).json({ success: true })
+}
+
+interface DiscordAuthResponse {
+    access_token: string
+    expires_in: number
+    refresh_token: string
+    scope: string
+    token_type: string
+}
+
+interface DiscordProfileResponse {
+    id: string
+    username: string
+    discriminator: string
+}
+
+export async function connectDiscord(ctx: RequestContext, req: Request, res: Response) {
+    const { code, redirectUri, profile } = req.body.data
+    if (!ctx.profiles.includes(profile)) {
+        res.status(401).send("You don't own this profile").end()
+        return
+    }
+    try {
+        const data = new URLSearchParams()
+        data.append('client_id', process.env.DISCORD_CLIENT_ID as string)
+        data.append('client_secret', process.env.DISCORD_CLIENT_SECRET as string)
+        data.append('grant_type', 'authorization_code')
+        data.append('scope', 'identify')
+        data.append('code', code)
+        data.append('redirect_uri', redirectUri)
+
+        const authResponse = await axios.post<DiscordAuthResponse>(`https://discord.com/api/oauth2/token`, data)
+
+        const profileResponse = await axios.get<DiscordProfileResponse>('https://discord.com/api/users/@me', {
+            headers: { Authorization: `Bearer ${authResponse.data.access_token}` },
+        })
+
+        const { username, id, discriminator } = profileResponse.data
+
+        await updateUserDiscordData(profile, id, `${username}#${discriminator}`)
+
+        res.status(200).json({ success: true })
+    } catch (err) {
+        res.status(400).json({ success: false })
+        logger.error(err)
+        throw new Error(`Fail to connect discord, profile address ${profile}`)
+    }
 }

@@ -25,7 +25,6 @@ export const CreateCampaginInput = z.object({
     type: z.string().optional(),
     twitterQuest: z
         .object({
-            twitterHandle: z.string(),
             like: z.string().optional(),
             reply: z.string().optional(),
             follow: z.string().optional(),
@@ -42,4 +41,16 @@ export const CreateCampaginInput = z.object({
         })
         .array()
         .optional(),
+    discordReward: z
+        .object({
+            serverId: z.string(),
+            roleId: z.string(),
+        })
+        .optional(),
+})
+
+export const VerifyDiscordServerInput = z.object({
+    profileId: z.string(),
+    discordServerId: z.string(),
+    roleId: z.string(),
 })

@@ -8,7 +8,7 @@ import { QuestSubmissionInput, ApproveQuestInput, CreateCampaginInput } from './
 
 import { DocumentData, Timestamp } from 'firebase-admin/firestore'
 import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
-//import { sleep } from './utils'
+import { assignRole } from './discord'
 
 const db = admin.firestore()
 db.settings({ ignoreUndefinedProperties: true })
@@ -64,6 +64,20 @@ export const updateUserTwitterData = async (
 ) => {
     const ref = db.collection('users').doc(profileAddress)
     return await ref.update({ twitterId, twitterHandle })
+}
+
+export const updateUserDiscordData = async (
+    profileAddress: string,
+    discordId: string | null,
+    discordHandle: string | null,
+) => {
+    const existingUser = await db.collection('users').where('discordId', '==', discordId).limit(1).get()
+    if (existingUser.docs.length > 0) {
+        await existingUser.docs[0].ref.update({ discordId: null, discordHandle: null })
+    }
+
+    const ref = db.collection('users').doc(profileAddress)
+    return await ref.update({ discordId, discordHandle })
 }
 
 export const isProfileEVMOnly = async (profileName: string): Promise<boolean> => {
@@ -209,6 +223,7 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
     }
 
     const badge = await getDoc<ICampaign>('badgeId', badgeId)
+    const profile = await getDoc<IProfile>('users', minterProfile)
 
     if (badge == null) {
         res.status(400).send('Invaild badge').end()
@@ -264,6 +279,15 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
     if (badge.point != null && badge.point > 0) {
         await addCampaignPoint(badge.profileId, minter, badge.point)
     }
+    if (badge.discordReward != null) {
+        if (profile.discordId != null) {
+            await assignRole({
+                serverId: badge.discordReward.serverId,
+                roleId: badge.discordReward.roleId,
+                userId: profile.discordId,
+            })
+        }
+    }
 
     res.status(201).end()
 }
@@ -289,6 +313,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         suiQuests,
         type,
         manualQuests,
+        discordReward,
     } = result.data
 
     const { profiles } = ctx
@@ -320,6 +345,8 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         twitterQuest,
         suiQuests,
         type: type ?? 'sui',
+        // not verifiy discord setting here, frontend should use other API to verfiy the setting before creating the campagin
+        discordReward,
         // Assign ID to manual quest
         manualQuests: manualQuests?.map((quest) => {
             return {

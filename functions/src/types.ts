@@ -85,6 +85,8 @@ export const Profile = z.object({
     twitterId: z.string().optional().nullable(),
     twitterHandle: z.string().optional().nullable(),
     chainId: z.string().optional().nullable(),
+    discordId: z.string().optional().nullable(),
+    discordHandle: z.string().optional().nullable(),
 })
 
 export type IProfile = z.infer<typeof Profile>
@@ -222,4 +224,9 @@ export interface User {
     lastActivity: Timestamp
     name: string
     profileId: string
+}
+
+export interface DiscordServer {
+    serverId: string
+    ownerProfile: string
 }

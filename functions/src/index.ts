@@ -29,12 +29,20 @@ import { ApifyTwitterRes } from './types'
 
 import * as firestore from './firestore'
 import * as oauth from './oauth'
+import * as discord from './discord'
 
 export { taskCreated, flagsUpdated } from './task'
 
 export const entrypoint = onRequest(
     {
-        secrets: ['JWT_SECRET', 'TWITTER_COMSUMER_SECRET', 'TWITTER_BEARER_TOKEN', 'SCRAPER_API_TOKEN'],
+        secrets: [
+            'JWT_SECRET',
+            'TWITTER_COMSUMER_SECRET',
+            'TWITTER_BEARER_TOKEN',
+            'SCRAPER_API_TOKEN',
+            'DISCORD_CLIENT_SECRET',
+            'DISCORD_BOT_TOKEN',
+        ],
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         minInstances: 1,
     },
@@ -122,6 +130,9 @@ export const entrypoint = onRequest(
             case 'connectTwitter':
                 applyJwtValidation(oauth.connectTwitter)(req, res)
                 break
+            case 'connectDiscord':
+                applyJwtValidation(oauth.connectDiscord)(req, res)
+                break
             case 'disconnectTwitter':
                 applyJwtValidation(oauth.disconnectTwitter)(req, res)
                 break
@@ -130,6 +141,9 @@ export const entrypoint = onRequest(
                 break
             case 'updateQuestSubmission':
                 applyJwtValidation(firestore.updateQuestSubmission)(req, res)
+                break
+            case 'verifyDiscordServer':
+                discord.verifyDiscordServer({} as any, req, res)
                 break
             default:
                 res.status(400).send('Unexpected action').end()
