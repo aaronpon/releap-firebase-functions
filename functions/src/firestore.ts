@@ -29,6 +29,31 @@ export async function storeDoc(collection: string, docId: string, data: Document
     const ref = db.collection(collection).doc(docId)
     return await ref.set(data)
 }
+export async function addCampaignPoint(campaignProfile: string, minter: string, point: number) {
+    const ref = db
+        .collection('campaginPoints')
+        .where('campaignProfile', '==', campaignProfile)
+        .where('minter', '==', minter)
+        .limit(1)
+    await db.runTransaction(
+        async (tx) => {
+            const doc = (await tx.get(ref)).docs[0]
+            if (doc != null) {
+                const data: { campaignProfile: string; minter: string; point: number } = doc.data() as any
+                tx.set(doc.ref, { ...data, point: data.point + point }, { merge: true })
+            } else {
+                const data = {
+                    campaignProfile,
+                    minter,
+                    point,
+                }
+                tx.set(db.collection('campaginPoints').doc(`${campaignProfile}.${minter}`), data)
+            }
+        },
+        { maxAttempts: 100 },
+    )
+}
+
 export const updateUserTwitterData = async (
     profileAddress: string,
     twitterId: string | null,
@@ -240,6 +265,10 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
         point: badge.point ?? 0,
         timeStamp,
     })
+
+    if (badge.point != null && badge.point > 0) {
+        await addCampaignPoint(badge.profileId, minter, badge.point)
+    }
 
     res.status(201).end()
 }
