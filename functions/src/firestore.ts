@@ -352,6 +352,12 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
                 let count = 0
                 let hasNext = true
 
+                // Convert any action into Sui Quest, don't check if it is empty string
+                if (suiQuest.event === '') {
+                    completed = true
+                    break
+                }
+
                 // Maxium search 250 events
                 while (count < 5 && hasNext) {
                     const result = await provider.queryEvents({
