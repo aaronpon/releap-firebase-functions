@@ -286,6 +286,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         twitterQuest,
         point,
         suiQuests,
+        type,
     } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
@@ -314,6 +315,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         timeStamp,
         twitterQuest,
         suiQuests,
+        type: type ?? 'sui',
     })
 
     res.status(201).end()
