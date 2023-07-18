@@ -371,7 +371,7 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
                     cursor = result.nextCursor
                     hasNext = result.hasNextPage
 
-                    if (result.data.some((it) => it.type === suiQuest.event)) {
+                    if (result.data.some((it) => it.type.startsWith(suiQuest.event as string))) {
                         completed = true
                         break
                     }
