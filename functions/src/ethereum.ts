@@ -72,21 +72,34 @@ export const getFirstProfileName = async (address: string): Promise<string | nul
     try {
         const evmContract = process.env.EVM_CONTRACT as `0x${string}`
 
-        const tokenId = await client.readContract({
+        const balance = (await client.readContract({
             address: evmContract,
             abi: evmContractABI.abi,
-            functionName: 'tokenOfOwnerByIndex',
-            args: [address, 0],
-        })
+            functionName: 'balanceOf',
+            args: [address],
+        })) as bigint
 
-        const profileName = (await client.readContract({
-            address: evmContract,
-            abi: evmContractABI.abi,
-            functionName: 'getProfileNameByTokenId',
-            args: [tokenId],
-        })) as string
+        console.log('Balance of EVM Profile Name: ', Number(balance))
 
-        return profileName
+        if (Number(balance) > 0) {
+            const tokenId = await client.readContract({
+                address: evmContract,
+                abi: evmContractABI.abi,
+                functionName: 'tokenOfOwnerByIndex',
+                args: [address, 0],
+            })
+
+            const profileName = (await client.readContract({
+                address: evmContract,
+                abi: evmContractABI.abi,
+                functionName: 'getProfileNameByTokenId',
+                args: [tokenId],
+            })) as string
+
+            return profileName
+        } else {
+            return null
+        }
     } catch (e) {
         logger.info(`error: ${e}`)
         return null
