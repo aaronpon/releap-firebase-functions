@@ -31,7 +31,7 @@ export async function storeDoc(collection: string, docId: string, data: Document
 }
 export async function addCampaignPoint(campaignProfile: string, minter: string, point: number) {
     const ref = db
-        .collection('campaginPoints')
+        .collection('campaignPoints')
         .where('campaignProfile', '==', campaignProfile)
         .where('minter', '==', minter)
         .limit(1)
@@ -47,7 +47,7 @@ export async function addCampaignPoint(campaignProfile: string, minter: string, 
                     minter,
                     point,
                 }
-                tx.set(db.collection('campaginPoints').doc(`${campaignProfile}.${minter}`), data)
+                tx.set(db.collection('campaignPoints').doc(`${campaignProfile}.${minter}`), data)
             }
         },
         { maxAttempts: 100 },
