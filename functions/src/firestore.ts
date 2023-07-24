@@ -79,9 +79,9 @@ export const isProfileEVMOnly = async (profileName: string): Promise<boolean> =>
  * postId: comment
  */
 export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { name, profileId, isEVM } = req.body.data
+    const { name, profileId, isEVM, chainId } = req.body.data
 
-    await storeDoc('users', profileId, { name, profileId, isEVM })
+    await storeDoc('users', profileId, { name, profileId, isEVM, chainId })
 
     res.status(201).end()
 }
