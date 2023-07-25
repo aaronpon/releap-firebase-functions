@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import * as jsonwebtoken from 'jsonwebtoken'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
-import { Connection, fromSerializedSignature, IntentScope, JsonRpcProvider, verifyMessage } from '@mysten/sui.js'
+import { Connection, IntentScope, JsonRpcProvider, verifyMessage, toSingleSignaturePubkeyPair } from '@mysten/sui.js'
 import { LoginChallengeToken, LoginChallengeTokenEth, RequestContext, TokenPayload } from './types'
 import { getAllOwnedObjects, RPC } from './utils'
 import { SiweMessage } from 'siwe'
@@ -129,7 +129,7 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
 
     const { attemptPublicKey: publicKey, signData } = decoded
 
-    const { pubKey } = fromSerializedSignature(signature)
+    const { pubKey } = toSingleSignaturePubkeyPair(signature)
 
     if (pubKey.toSuiAddress() !== publicKey) {
         res.status(400).send('Invalid Sui Address').end()

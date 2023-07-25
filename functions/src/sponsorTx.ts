@@ -294,12 +294,12 @@ export async function waitTask(taskId: string) {
 }
 
 async function findAndSetProfileOwnerCap(provider: JsonRpcProvider, adminPublicKey: string, profile: string) {
-    let cap = await findProfileOwnerCap(profile)
-    if (cap == null) {
-        cap = await findProfileOwnerCapFromChain(provider, adminPublicKey, profile)
-        if (cap != null) {
-            await setProfileOwnerCap(profile, cap)
+    let profileOwnerCap: string | undefined = await findProfileOwnerCap(profile)
+    if (profileOwnerCap == null) {
+        profileOwnerCap = await findProfileOwnerCapFromChain(provider, adminPublicKey, profile)
+        if (profileOwnerCap != null) {
+            await setProfileOwnerCap(profile, profileOwnerCap)
         }
     }
-    return cap
+    return profileOwnerCap
 }
