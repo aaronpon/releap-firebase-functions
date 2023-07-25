@@ -34,7 +34,7 @@ export async function storeDoc<T extends DocumentData>(collection: string, docId
 }
 
 export async function findProfileOwnerCap(profile: string) {
-    return (await getDoc<{ profileOwnerCap: string }>('profileOwnerCaps', profile)).profileOwnerCap
+    return (await getDoc<{ profileOwnerCap: string }>('profileOwnerCaps', profile))?.profileOwnerCap
 }
 
 export async function setProfileOwnerCap(profile: string, profileOwnerCap: string) {
