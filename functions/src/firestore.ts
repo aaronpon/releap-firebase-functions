@@ -32,6 +32,15 @@ export async function storeDoc<T extends DocumentData>(collection: string, docId
     const ref = db.collection(collection).doc(docId)
     return await ref.set(data)
 }
+
+export async function findProfileOwnerCap(profile: string) {
+    return (await getDoc<{ profileOwnerCap: string }>('profileOwnerCaps', profile)).profileOwnerCap
+}
+
+export async function setProfileOwnerCap(profile: string, profileOwnerCap: string) {
+    return await storeDoc('profileOwnerCaps', profile, { profileOwnerCap })
+}
+
 export async function addCampaignPoint(campaignProfile: string, minter: string, point: number) {
     const ref = db
         .collection('campaignPoints')

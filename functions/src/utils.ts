@@ -26,6 +26,20 @@ export async function getAllOwnedObjects(provider: JsonRpcProvider, address: str
     return data
 }
 
+export async function findProfileOwnerCapFromChain(provider: JsonRpcProvider, wallet: string, profile: string) {
+    const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
+    const objects = await getAllOwnedObjects(provider, wallet)
+
+    return objects.find((obj) => {
+        const content = obj.data?.content
+        if (content?.dataType === 'moveObject') {
+            const objPackage = content?.type.split('::')[0]
+            return content.fields['profile'] === profile && dappPackages.includes(objPackage)
+        }
+        return false
+    })?.data?.objectId
+}
+
 export async function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
 }

@@ -210,6 +210,39 @@ export async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Prom
                     arguments: [tx.object(curr.data.payload.followingProfile), tx.object(curr.data.payload.profile)],
                 })
                 break
+            case 'updateProfileImage':
+                tx.moveCall({
+                    target: `${dappPackages[0]}::releap_social::update_profile_image`,
+                    typeArguments: [],
+                    arguments: [
+                        tx.object(curr.data.payload.profile),
+                        tx.object(curr.data.payload.profileOwnerCap),
+                        tx.object(curr.data.payload.imageUrl),
+                    ],
+                })
+                break
+            case 'updateProfileCover':
+                tx.moveCall({
+                    target: `${dappPackages[0]}::releap_social::update_profile_cover_image`,
+                    typeArguments: [],
+                    arguments: [
+                        tx.object(curr.data.payload.profile),
+                        tx.object(curr.data.payload.profileOwnerCap),
+                        tx.object(curr.data.payload.coverUrl),
+                    ],
+                })
+                break
+            case 'updateProfileDescription':
+                tx.moveCall({
+                    target: `${dappPackages[0]}::releap_social::update_profile_description`,
+                    typeArguments: [],
+                    arguments: [
+                        tx.object(curr.data.payload.profile),
+                        tx.object(curr.data.payload.profileOwnerCap),
+                        tx.object(curr.data.payload.description),
+                    ],
+                })
+                break
         }
         return tx
     }, txBlock)

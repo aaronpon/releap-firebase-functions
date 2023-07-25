@@ -125,6 +125,7 @@ export interface AppContext {
     role: 'admin' | 'user'
     isEth: boolean
     provider: JsonRpcProvider
+    adminPublicKey: string
     signer: RawSigner
     // env
     dappPackages: string[]
@@ -164,6 +165,12 @@ export interface TaskRequest {
               action: 'unfollowProfile'
               payload: { profile: string; followingProfile: string }
           }
+        | {
+              action: 'updateProfileDescription'
+              payload: { profile: string; description: string; profileOwnerCap: string }
+          }
+        | { action: 'updateProfileImage'; payload: { profile: string; imageUrl: string; profileOwnerCap: string } }
+        | { action: 'updateProfileCover'; payload: { profile: string; coverUrl: string; profileOwnerCap: string } }
 }
 
 export interface TaskResponse {

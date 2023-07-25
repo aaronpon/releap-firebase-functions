@@ -22,6 +22,9 @@ import {
     unfollowProfile,
     adminCreatePost,
     createProfile,
+    updateProfileImage,
+    updateProfileCover,
+    updateProfileDescription,
 } from './sponsorTx'
 import { getTwitterScraperProfiles, updateLastScrap as updateLastScrape } from './firestore'
 import { scrapeProfile as scrapeTweets } from './api'
@@ -92,6 +95,15 @@ export const entrypoint = onRequest(
                 break
             case 'unfollowProfile':
                 applyJwtValidation(unfollowProfile)(req, res)
+                break
+            case 'updateProfileImage':
+                applyJwtValidation(updateProfileImage)(req, res)
+                break
+            case 'updateProfileCover':
+                applyJwtValidation(updateProfileCover)(req, res)
+                break
+            case 'updateProfileDescription':
+                applyJwtValidation(updateProfileDescription)(req, res)
                 break
             // Firestore
             case 'fireStoreCreateProfile':
