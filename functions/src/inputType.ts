@@ -31,7 +31,7 @@ export const CreateCampaginInput = z.object({
             retweet: z.string().optional(),
         })
         .optional(),
-    suiQuests: z.object({ event: z.string() }).array().optional(),
+    suiQuests: z.object({ event: z.string(), url: z.string(), description: z.string() }).array().optional(),
     manualQuests: z
         .object({
             id: z.string().optional(),
