@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "releap-production-ecefb"
-  }
+    "default": "releap-production-ecefb",
+    "staging": "releap-testnet"
+  },
+  "targets": {},
+  "etags": {}
 }

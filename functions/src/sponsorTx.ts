@@ -7,9 +7,10 @@ import { Response } from 'express'
 import admin from 'firebase-admin'
 
 import { RequestContext, TaskRequest, TaskResponse } from './types'
-import { RPC, obj2Arr, sleep } from './utils'
+import { RPC, findProfileOwnerCapFromChain, obj2Arr, sleep } from './utils'
 import { checkAddressOwnsProfileName } from './ethereum'
 import { JsonRpcProvider, Connection } from '@mysten/sui.js'
+import { findProfileOwnerCap, setProfileOwnerCap } from './firestore'
 
 globalThis.fetch = fetch as any
 
@@ -28,7 +29,6 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     let ownsProfile = false
 
     const provider = new JsonRpcProvider(new Connection({ fullnode: RPC }))
-
     const df = await provider.getDynamicFieldObject({
         parentId: process.env.PROFILE_TABLE as string,
         name: { type: '0x1::string::String', value: profileName },
@@ -202,7 +202,87 @@ export const unfollowProfile = async (ctx: RequestContext, req: Request, res: Re
     res.status(201).json(result)
 }
 
-async function waitTask(taskId: string) {
+export const updateProfileImage = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles, provider, adminPublicKey } = ctx
+    const { imageUrl, profile } = req.body.data
+
+    if (!profiles.includes(profile)) {
+        res.status(401).send("You don't own this profile").end()
+        return
+    }
+
+    const profileOwnerCap = await findAndSetProfileOwnerCap(provider, adminPublicKey, profile)
+
+    if (profileOwnerCap == null) {
+        res.status(500).send('Fail to find profileOwnerCap').end()
+        return
+    }
+
+    const task: TaskRequest = {
+        data: {
+            action: 'updateProfileImage',
+            payload: { profile, imageUrl, profileOwnerCap },
+        },
+    }
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
+}
+
+export const updateProfileCover = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles, provider, adminPublicKey } = ctx
+    const { coverUrl, profile } = req.body.data
+
+    if (!profiles.includes(profile)) {
+        res.status(401).send("You don't own this profile").end()
+        return
+    }
+    const profileOwnerCap = await findAndSetProfileOwnerCap(provider, adminPublicKey, profile)
+
+    if (profileOwnerCap == null) {
+        res.status(500).send('Fail to find profileOwnerCap').end()
+        return
+    }
+
+    const task: TaskRequest = {
+        data: {
+            action: 'updateProfileCover',
+            payload: { profile, coverUrl, profileOwnerCap },
+        },
+    }
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
+}
+
+export const updateProfileDescription = async (ctx: RequestContext, req: Request, res: Response) => {
+    const { profiles, provider, adminPublicKey } = ctx
+    const { description, profile } = req.body.data
+
+    if (!profiles.includes(profile)) {
+        res.status(401).send("You don't own this profile").end()
+        return
+    }
+
+    const profileOwnerCap = await findAndSetProfileOwnerCap(provider, adminPublicKey, profile)
+
+    if (profileOwnerCap == null) {
+        res.status(500).send('Fail to find profileOwnerCap').end()
+        return
+    }
+
+    const task: TaskRequest = {
+        data: {
+            action: 'updateProfileDescription',
+            payload: { profile, description, profileOwnerCap },
+        },
+    }
+    const { key } = await admin.database().ref('/tasks').push(task)
+    const result = await waitTask(key as string)
+    res.status(201).json(result)
+}
+
+export async function waitTask(taskId: string) {
     while (true) {
         const taskRes = await admin.database().ref(`/tasks_res/${taskId}`).once('value')
         const json = taskRes.toJSON() as unknown as TaskResponse | undefined
@@ -211,4 +291,15 @@ async function waitTask(taskId: string) {
             return obj2Arr(json)
         }
     }
+}
+
+async function findAndSetProfileOwnerCap(provider: JsonRpcProvider, adminPublicKey: string, profile: string) {
+    let profileOwnerCap: string | undefined = await findProfileOwnerCap(profile)
+    if (profileOwnerCap == null) {
+        profileOwnerCap = await findProfileOwnerCapFromChain(provider, adminPublicKey, profile)
+        if (profileOwnerCap != null) {
+            await setProfileOwnerCap(profile, profileOwnerCap)
+        }
+    }
+    return profileOwnerCap
 }

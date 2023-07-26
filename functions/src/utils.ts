@@ -1,7 +1,11 @@
 import { JsonRpcProvider, PaginatedObjectsResponse } from '@mysten/sui.js'
 
-export const RPC = process.env.SUI_RPC ?? 'https://fullnode.mainnet.sui.io:443'
+export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
+
+export const GAS_COUNT = parseInt(process.env.GAS_COUNT ?? '20')
+export const GAS_AMOUNT = parseFloat(process.env.GAS_AMOUNT ?? '1')
+
 export async function getAllOwnedObjects(provider: JsonRpcProvider, address: string) {
     const data: PaginatedObjectsResponse['data'] = []
     let nextCursor = null
@@ -20,6 +24,20 @@ export async function getAllOwnedObjects(provider: JsonRpcProvider, address: str
         data.push(...ownedObjectsResponse.data)
     }
     return data
+}
+
+export async function findProfileOwnerCapFromChain(provider: JsonRpcProvider, wallet: string, profile: string) {
+    const dappPackages = process.env.DAPP_PACKAGES?.split(',') ?? []
+    const objects = await getAllOwnedObjects(provider, wallet)
+
+    return objects.find((obj) => {
+        const content = obj.data?.content
+        if (content?.dataType === 'moveObject') {
+            const objPackage = content?.type.split('::')[0]
+            return content.fields['profile'] === profile && dappPackages.includes(objPackage)
+        }
+        return false
+    })?.data?.objectId
 }
 
 export async function sleep(ms: number): Promise<void> {
@@ -46,4 +64,26 @@ export function obj2Arr(object: any): any {
         }
         return converted
     }
+}
+
+export async function retry<T>(
+    callback: () => Promise<T>,
+    options: {
+        retryCount: number
+        retryDelayMs: number
+    },
+): Promise<T> {
+    let retry = 0
+    while (retry <= options.retryCount) {
+        try {
+            return await callback()
+        } catch (err) {
+            if (retry >= options.retryCount) {
+                throw err
+            }
+            retry++
+        }
+        await sleep(options.retryDelayMs)
+    }
+    throw new Error('Retry limit exceeded')
 }

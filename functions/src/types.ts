@@ -1,5 +1,105 @@
 import { JsonRpcProvider, RawSigner, SuiTransactionBlockResponse } from '@mysten/sui.js'
 import { Timestamp } from 'firebase-admin/firestore'
+import z from 'zod'
+import { CreateCampaginInput, QuestSubmissionInput } from './inputType'
+
+// DB Schema ====================================================
+/*
+ * Events schema
+ * -----------
+ * type: 'comment' | 'follow' | 'like'
+ * profileId: profile to be notify
+ * sender: sender
+ * post: parent
+ * postId: comment
+ */
+export const Event = z.object({
+    type: z.enum(['comment', 'follow', 'like'] as const),
+    profileId: z.string(),
+    sender: z.string(),
+    post: z.string().optional().nullable(),
+    postId: z.string().optional().nullable(),
+    timeStamp: z.instanceof(Timestamp),
+})
+
+export const Post = z.object({
+    postId: z.string(),
+    profileId: z.string(),
+    timeStamp: z.instanceof(Timestamp),
+})
+
+export const Comment = z.object({
+    postId: z.string(),
+    parentId: z.string(),
+    profileId: z.string(),
+    timeStamp: z.instanceof(Timestamp),
+})
+
+export const Badge = z.object({
+    badgeId: z.string(),
+    minter: z.string(),
+    minterProfile: z.string().optional(),
+    timeStamp: z.instanceof(Timestamp),
+})
+
+export const Point = z.object({
+    badgeId: z.string(),
+    minter: z.string(),
+    campaignProfile: z.string(),
+    point: z.number(),
+    timeStamp: z.instanceof(Timestamp),
+})
+
+export const Campaign = CreateCampaginInput.extend({
+    timeStamp: z.instanceof(Timestamp),
+    manualQuests: z
+        .object({
+            id: z.string(),
+            type: z.enum(['url', 'image', 'text'] as const),
+            description: z.string(),
+            data: z.string(),
+        })
+        .array()
+        .optional(),
+})
+
+export const ProfileQuest = z.object({
+    like: z.boolean(),
+    follow: z.boolean(),
+    reply: z.boolean(),
+    retweet: z.boolean(),
+})
+
+export const QuestSubmission = QuestSubmissionInput.extend({
+    wallet: z.string(),
+    profileId: z.string(),
+    status: z.enum(['pending', 'approved', 'rejected'] as const),
+    createdAt: z.instanceof(Timestamp),
+    updatedAt: z.instanceof(Timestamp).optional(),
+})
+
+export const Profile = z.object({
+    name: z.string(),
+    profileId: z.string(),
+    isEVM: z.boolean(),
+    twitterId: z.string().optional().nullable(),
+    twitterHandle: z.string().optional().nullable(),
+    chainId: z.string().optional().nullable(),
+    discordId: z.string().optional().nullable(),
+    discordHandle: z.string().optional().nullable(),
+})
+
+export type IProfile = z.infer<typeof Profile>
+export type IQuestSubmission = z.infer<typeof QuestSubmission>
+export type ICampaign = z.infer<typeof Campaign>
+export type IPoint = z.infer<typeof Point>
+export type IBadge = z.infer<typeof Badge>
+export type IComment = z.infer<typeof Comment>
+export type IEvent = z.infer<typeof Event>
+export type IPost = z.infer<typeof Post>
+export type IProfileQuest = z.infer<typeof ProfileQuest>
+
+//========================================================================
 
 export interface LoginChallengeToken {
     attemptPublicKey: string
@@ -14,6 +114,7 @@ export interface LoginChallengeTokenEth {
 
 export interface TokenPayload {
     publicKey: string
+    role: 'admin' | 'user'
     profiles: string[]
     isEth: boolean
 }
@@ -21,8 +122,10 @@ export interface TokenPayload {
 export interface AppContext {
     publicKey: string
     profiles: string[]
+    role: 'admin' | 'user'
     isEth: boolean
     provider: JsonRpcProvider
+    adminPublicKey: string
     signer: RawSigner
     // env
     dappPackages: string[]
@@ -32,7 +135,7 @@ export interface AppContext {
     adminCap: string
 }
 
-export type ShareContext = Omit<AppContext, 'publicKey' | 'profiles' | 'isEth'>
+export type ShareContext = Omit<AppContext, 'publicKey' | 'profiles' | 'isEth' | 'role'>
 export type RequestContext = Omit<AppContext, 'signer'>
 
 export interface TaskRequest {
@@ -62,6 +165,12 @@ export interface TaskRequest {
               action: 'unfollowProfile'
               payload: { profile: string; followingProfile: string }
           }
+        | {
+              action: 'updateProfileDescription'
+              payload: { profile: string; description: string; profileOwnerCap: string }
+          }
+        | { action: 'updateProfileImage'; payload: { profile: string; imageUrl: string; profileOwnerCap: string } }
+        | { action: 'updateProfileCover'; payload: { profile: string; coverUrl: string; profileOwnerCap: string } }
 }
 
 export interface TaskResponse {
@@ -117,27 +226,14 @@ export interface Media {
     video_url: string
 }
 
-export interface TwitterQuest {
-    like: string | undefined
-    follow: string | undefined
-    reply: string | undefined
-    retweet: string | undefined
-}
-
-export interface SuiQuest {
-    event: string | undefined
-}
-
-export interface ProfileQuest {
-    like: boolean
-    follow: boolean
-    reply: boolean
-    retweet: boolean
-}
-
 export interface User {
     isEVM: boolean
     lastActivity: Timestamp
     name: string
     profileId: string
+}
+
+export interface DiscordServer {
+    serverId: string
+    ownerProfile: string
 }

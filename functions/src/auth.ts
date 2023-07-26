@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import * as jsonwebtoken from 'jsonwebtoken'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
-import { Connection, fromSerializedSignature, IntentScope, JsonRpcProvider, verifyMessage } from '@mysten/sui.js'
+import { Connection, IntentScope, JsonRpcProvider, verifyMessage, toSingleSignaturePubkeyPair } from '@mysten/sui.js'
 import { LoginChallengeToken, LoginChallengeTokenEth, RequestContext, TokenPayload } from './types'
 import { getAllOwnedObjects, RPC } from './utils'
 import { SiweMessage } from 'siwe'
@@ -10,6 +10,8 @@ import { getFirstProfileName } from './ethereum'
 import { isProfileEVMOnly } from './firestore'
 
 const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
+
+const adminWallet = ['0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151']
 
 export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, res: Response) => Promise<void>) {
     return async (req: Request, res: Response) => {
@@ -26,6 +28,7 @@ export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, 
 
         let publicKey
         let profiles
+        let role
         let isEth = false
         try {
             const tokenPayload: TokenPayload = verfiyJwt(jwt, process.env.JWT_SECRET as string)
@@ -36,6 +39,7 @@ export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, 
             publicKey = tokenPayload.publicKey
             profiles = tokenPayload.profiles
             isEth = tokenPayload.isEth
+            role = tokenPayload.role
         } catch (err) {
             res.status(400).send('Invaild JWT').end()
             return
@@ -46,9 +50,11 @@ export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, 
                 publicKey,
                 profiles,
                 isEth,
+                role,
                 dappPackages: process.env.DAPP_PACKAGES?.split(',') ?? [],
                 recentPosts: process.env.RECENT_POSTS as string,
                 adminCap: process.env.ADMIN_CAP as string,
+                adminPublicKey: process.env.ADMIN_PUBLICKEY as string,
                 index: process.env.INDEX as string,
                 profileTable: process.env.PROFILE_TABLE as string,
                 provider: new JsonRpcProvider(new Connection({ fullnode: RPC })),
@@ -123,7 +129,7 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
 
     const { attemptPublicKey: publicKey, signData } = decoded
 
-    const { pubKey } = fromSerializedSignature(signature)
+    const { pubKey } = toSingleSignaturePubkeyPair(signature)
 
     if (pubKey.toSuiAddress() !== publicKey) {
         res.status(400).send('Invalid Sui Address').end()
@@ -206,6 +212,7 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
         publicKey,
         profiles,
         isEth: options.isEth,
+        role: adminWallet.includes(publicKey) ? 'admin' : 'user',
     }
 
     return jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
