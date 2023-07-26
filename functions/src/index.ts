@@ -48,7 +48,8 @@ export const entrypoint = onRequest(
             'DISCORD_BOT_TOKEN',
         ],
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
-        minInstances: 1,
+        minInstances: 2,
+        timeoutSeconds: 180,
     },
     async (req, res) => {
         if (req.method === 'OPTIONS') {
