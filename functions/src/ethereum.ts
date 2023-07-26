@@ -1,11 +1,11 @@
 import { createPublicClient, http } from 'viem'
-import { zkSyncTestnet } from 'viem/chains'
+import { zkSync, zkSyncTestnet } from 'viem/chains'
 import evmContractABI from './ethereum/evmContractABI.json'
 import { logger } from 'firebase-functions/v1'
 
 export const checkAddressOwnsProfileName = async (address: string, profileName: string) => {
     const client = createPublicClient({
-        chain: zkSyncTestnet,
+        chain: process.env.EVM_NETWORK == 'zkSyncTestnet' ? zkSyncTestnet : zkSync,
         transport: http(),
     })
     logger.info(`Checking address ownership: ${address} ${profileName}`)
@@ -25,7 +25,7 @@ export const checkAddressOwnsProfileName = async (address: string, profileName: 
 
 export const getAllProfilenames = async (address: string) => {
     const client = createPublicClient({
-        chain: zkSyncTestnet,
+        chain: process.env.EVM_NETWORK == 'zkSyncTestnet' ? zkSyncTestnet : zkSync,
         transport: http(),
     })
 
@@ -65,7 +65,7 @@ export const getAllProfilenames = async (address: string) => {
 
 export const getFirstProfileName = async (address: string): Promise<string | null> => {
     const client = createPublicClient({
-        chain: zkSyncTestnet,
+        chain: process.env.EVM_NETWORK == 'zkSyncTestnet' ? zkSyncTestnet : zkSync,
         transport: http(),
     })
 
