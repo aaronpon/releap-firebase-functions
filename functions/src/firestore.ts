@@ -385,7 +385,7 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
 
     const { twitterQuest, suiQuests, manualQuests } = (await getDoc<ICampaign>('badgeId', badgeId)) ?? {}
 
-    const manualQuestsCompleted = await checkManualQuest(db, manualQuests)
+    const manualQuestsCompleted = await checkManualQuest(db, profile, manualQuests)
     const suiQuestCompleted = await checkSuiQuest(provider, publicKey, suiQuests)
     const twitterQuestCompleted = await checkTwitterQuest(db, profile, badgeId, twitterQuest)
 
