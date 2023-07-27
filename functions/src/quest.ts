@@ -4,28 +4,37 @@ import { JsonRpcProvider } from '@mysten/sui.js'
 import { isFollowed, isLiked, isReplyed, isRetweeted } from './twitter'
 import { getDoc } from './firestore'
 
-export async function checkManualQuest(db: Firestore, manualQuests: ICampaign['manualQuests']) {
-    const manualQuestsCompleted: { questId: string; completed: boolean }[] = []
-    if (manualQuests != null && manualQuests.length > 0) {
-        const submission = (
-            await db
-                .collection('questSubmission')
-                .where(
-                    'questId',
-                    'in',
-                    manualQuests.map((it) => it.id),
-                )
-                .get()
-        ).docs.map((it) => it.data()) as IQuestSubmission[]
-
-        manualQuests.forEach((quest) => {
-            // users may have multiple submissions for one quest, we only need to find one of them is approved
-            const result = submission.find((it) => it.questId === quest.id && it.status === 'approved')
-            manualQuestsCompleted.push({ questId: quest.id, completed: result != null })
-        })
+export async function checkManualQuest(
+    db: Firestore,
+    profile: IProfile,
+    manualQuests: ICampaign['manualQuests'],
+): Promise<{ questId: string; approved: boolean; submited: boolean }[]> {
+    if (manualQuests == null || manualQuests.length === 0) {
+        return []
     }
 
-    return manualQuestsCompleted
+    const userSubmissions = (
+        await db
+            .collection('questSubmission')
+            .where(
+                'questId',
+                'in',
+                manualQuests.map((it) => it.id),
+            )
+            .where('profile', '==', profile.profileId)
+            .get()
+    ).docs.map((it) => it.data()) as IQuestSubmission[]
+
+    return manualQuests.map((quest) => {
+        // users may have multiple submissions for one quest
+        const submited = userSubmissions.filter((it) => it.questId === quest.id)
+        const approved = submited.filter((it) => it.status === 'approved')
+        return {
+            questId: quest.id,
+            submited: submited.length > 0,
+            approved: approved.length > 0,
+        }
+    })
 }
 
 export async function checkSuiQuest(provider: JsonRpcProvider, publicKey: string, suiQuests: ICampaign['suiQuests']) {
@@ -135,6 +144,6 @@ export function checkQuestEligibility(
         (suiQuestCompleted == null ? true : suiQuestCompleted) &&
         (manualQuestsCompleted.length == 0
             ? true
-            : manualQuestsCompleted.reduce((acc, curr) => acc && curr.completed, true))
+            : manualQuestsCompleted.reduce((acc, curr) => acc && curr.approved, true))
     )
 }
