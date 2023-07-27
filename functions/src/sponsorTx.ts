@@ -45,7 +45,7 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
             while (shouldWait) {
                 await sleep(waitedCount * 2000)
                 ownsProfile = await checkAddressOwnsProfileName(publicKey, profileName)
-                if (waitedCount > 5) {
+                if (waitedCount > 10) {
                     shouldWait = false
                     logger.error("You don't own this profile name on EVM Chain")
                     res.status(401).send("You don't own this profile name on EVM Chain").end()
