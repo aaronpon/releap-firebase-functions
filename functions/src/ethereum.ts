@@ -8,7 +8,6 @@ export const checkAddressOwnsProfileName = async (address: string, profileName: 
         chain: process.env.EVM_NETWORK == 'zkSyncTestnet' ? zkSyncTestnet : zkSync,
         transport: http(),
     })
-    logger.info(`Checking address ownership: ${address} ${profileName}`)
     try {
         const evmContract = process.env.EVM_CONTRACT as `0x${string}`
         const data = await client.readContract({
@@ -17,8 +16,10 @@ export const checkAddressOwnsProfileName = async (address: string, profileName: 
             functionName: 'getOwnerOfProfileName',
             args: [profileName],
         })
+        logger.info(`Checking if address owns: ${address} ${profileName} `, address == data)
         return address == data
     } catch (e) {
+        logger.error('ERROR: ', e)
         return false
     }
 }

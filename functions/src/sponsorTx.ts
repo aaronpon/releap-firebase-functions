@@ -11,6 +11,7 @@ import { RPC, findProfileOwnerCapFromChain, obj2Arr, sleep } from './utils'
 import { checkAddressOwnsProfileName } from './ethereum'
 import { JsonRpcProvider, Connection } from '@mysten/sui.js'
 import { findProfileOwnerCap, setProfileOwnerCap } from './firestore'
+import * as logger from 'firebase-functions/logger'
 
 globalThis.fetch = fetch as any
 
@@ -46,6 +47,7 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
                 ownsProfile = await checkAddressOwnsProfileName(publicKey, profileName)
                 if (waitedCount > 5) {
                     shouldWait = false
+                    logger.error("You don't own this profile name on EVM Chain")
                     res.status(401).send("You don't own this profile name on EVM Chain").end()
                 } else if (ownsProfile) {
                     shouldWait = false
@@ -54,6 +56,8 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
             }
         }
     }
+
+    logger.info('Found profile, creating sui profile')
 
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)

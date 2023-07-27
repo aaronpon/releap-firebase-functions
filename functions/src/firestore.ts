@@ -92,7 +92,7 @@ export const updateUserDiscordData = async (
 export const isProfileEVMOnly = async (profileName: string): Promise<boolean> => {
     const ref = db.collection('users').where('name', '==', profileName).limit(1)
     const firestoreUser: any = (await ref.get()).docs[0].data()
-    console.log('IS PROFILE EVM ONLY: ', firestoreUser)
+    console.log('Checking if user is EVM: ', profileName)
     return firestoreUser?.isEVM ?? false
 }
 
