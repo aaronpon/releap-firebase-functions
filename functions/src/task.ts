@@ -42,7 +42,8 @@ export const taskCreated = onValueCreated(
 
         try {
             const { digest, effects, events } = await retry(async () => await tasksRunner(shareCtx, [task]), {
-                retryCount: 2,
+                // createProfile may fail due to the profileIndex is locked by other tx
+                retryCount: task.data.action === 'createProfile' ? 50 : 5,
                 retryDelayMs: 0,
             })
             await admin.database().ref(`/tasks_res/${taskId}`).set({ digest, effects, events })
@@ -141,7 +142,7 @@ export async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Prom
             return gas
         },
         {
-            retryCount: 10,
+            retryCount: 50,
             retryDelayMs: 500,
         },
     )
