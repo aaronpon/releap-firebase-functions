@@ -92,7 +92,7 @@ export async function rebalanceGas(ignoreGasCheck = false) {
     if (!ignoreGasCheck) {
         const count = await getGasCount()
 
-        if (count > GAS_COUNT / 2) {
+        if (count > GAS_COUNT / 3) {
             return
         }
     }
