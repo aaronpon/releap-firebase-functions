@@ -249,16 +249,22 @@ export async function tasksRunner(ctx: ShareContext, tasks: TaskRequest[]): Prom
         return tx
     }, txBlock)
 
-    const result = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: tx,
-        options: { showEvents: true, showEffects: true },
-    })
+    try {
+        const result = await signer.signAndExecuteTransactionBlock({
+            transactionBlock: tx,
+            options: { showEvents: true, showEffects: true },
+        })
 
-    const usedGas = result.effects?.gasObject.reference
+        const usedGas = result.effects?.gasObject.reference
 
-    if (usedGas) {
-        await returnGas(usedGas)
+        if (usedGas) {
+            await returnGas(usedGas)
+        }
+        return result
+    } catch (err) {
+        console.log(err)
+        // return original gas
+        await returnGas(gas)
+        throw err
     }
-
-    return result
 }

@@ -218,10 +218,10 @@ export const twitterPosting = pubsub.schedule('*/5 * * * *').onRun(async () => {
 export const rebalance = onSchedule(
     {
         secrets: ['SEED_PHRASE'],
-        schedule: '*/15 * * * *',
+        schedule: '1 of month 09:00',
     },
     async () => {
-        await rebalanceGas()
+        await rebalanceGas(true)
     },
 )
 
