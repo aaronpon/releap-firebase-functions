@@ -12,7 +12,7 @@ import {
 import { onValueCreated } from 'firebase-functions/v2/database'
 import * as logger from 'firebase-functions/logger'
 import { ShareContext, TaskRequest } from './types'
-import { GAS_AMOUNT, GAS_COUNT, RPC, retry } from './utils'
+import { GAS_AMOUNT, GAS_COUNT, RPC, getAllOwnedCoinss, retry } from './utils'
 
 import admin from 'firebase-admin'
 import { db } from './firestore'
@@ -102,6 +102,8 @@ export async function rebalanceGas(ignoreGasCheck = false) {
     const publicKey = keypair.getPublicKey().toSuiAddress()
 
     const tx = new TransactionBlock()
+    const ownedGas = await getAllOwnedCoinss(provider, keypair.getPublicKey().toSuiAddress())
+    tx.setGasPayment(ownedGas)
     const amounts = Array(GAS_COUNT).fill(tx.pure(GAS_AMOUNT * Number(MIST_PER_SUI)))
     const splitCoins = tx.splitCoins(tx.gas, amounts)
     const array = amounts.map((_, idx) => splitCoins[idx])

@@ -1,4 +1,4 @@
-import { JsonRpcProvider, PaginatedObjectsResponse } from '@mysten/sui.js'
+import { JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
@@ -24,6 +24,30 @@ export async function getAllOwnedObjects(provider: JsonRpcProvider, address: str
         data.push(...ownedObjectsResponse.data)
     }
     return data
+}
+
+export async function getAllOwnedCoinss(provider: JsonRpcProvider, address: string) {
+    const data: PaginatedCoins['data'] = []
+    let nextCursor = null
+    let hasNextPage = true
+
+    while (hasNextPage) {
+        const ownedObjectsResponse: PaginatedCoins = await provider.getCoins({
+            owner: address,
+            coinType: SUI_TYPE_ARG,
+            cursor: nextCursor,
+        })
+
+        hasNextPage = ownedObjectsResponse.hasNextPage
+        nextCursor = ownedObjectsResponse.nextCursor
+
+        data.push(...ownedObjectsResponse.data)
+    }
+    return data.map((it) => ({
+        objectId: it.coinObjectId,
+        version: it.version,
+        digest: it.digest,
+    }))
 }
 
 export async function findProfileOwnerCapFromChain(provider: JsonRpcProvider, wallet: string, profile: string) {
