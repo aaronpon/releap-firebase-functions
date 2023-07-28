@@ -57,7 +57,7 @@ export const Campaign = CreateCampaginInput.extend({
             id: z.string(),
             type: z.enum(['url', 'image', 'text'] as const),
             description: z.string(),
-            data: z.string(),
+            name: z.string(),
         })
         .array()
         .optional(),

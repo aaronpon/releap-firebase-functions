@@ -37,7 +37,7 @@ export const CreateCampaginInput = z.object({
             id: z.string().optional(),
             type: z.enum(['url', 'image', 'text'] as const),
             description: z.string(),
-            data: z.string(),
+            name: z.string(),
         })
         .array()
         .optional(),
