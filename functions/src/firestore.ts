@@ -415,6 +415,19 @@ export const submitQuest = async (ctx: RequestContext, req: Request, res: Respon
         return
     }
 
+    const existingSubmission = await db
+        .collection('tasks')
+        .where('badgeId', '==', badgeId)
+        .where('questId', '==', questId)
+        .where('profileId', '==', profileId)
+        .where('status', 'in', ['pending', 'approved'])
+        .get()
+
+    if (existingSubmission.size > 0) {
+        res.status(400).send('You already submitted this quest').end()
+        return
+    }
+
     const task: IQuestSubmission = {
         badgeId,
         questId,
