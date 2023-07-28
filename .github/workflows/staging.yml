@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/*
+      - fix/*
 
 jobs:
   deploy:

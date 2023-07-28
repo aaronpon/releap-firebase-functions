@@ -73,6 +73,7 @@ export const ProfileQuest = z.object({
 export const QuestSubmission = QuestSubmissionInput.extend({
     wallet: z.string(),
     profileId: z.string(),
+    owner: z.string().optional(),
     status: z.enum(['pending', 'approved', 'rejected'] as const),
     createdAt: z.instanceof(Timestamp),
     updatedAt: z.instanceof(Timestamp).optional(),

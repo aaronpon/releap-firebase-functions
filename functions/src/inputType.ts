@@ -9,7 +9,7 @@ export const QuestSubmissionInput = z.object({
 
 export const ApproveQuestInput = z.object({
     submissionId: z.string(),
-    action: z.enum(['approve', 'reject'] as const),
+    action: z.enum(['approved', 'rejected'] as const),
 })
 
 export const CreateCampaginInput = z.object({

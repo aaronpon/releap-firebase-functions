@@ -8,7 +8,7 @@ export async function checkManualQuest(
     db: Firestore,
     profile: IProfile,
     manualQuests: ICampaign['manualQuests'],
-): Promise<{ questId: string; approved: boolean; submited: boolean }[]> {
+): Promise<{ questId: string; approved: boolean; submitted: boolean; canSubmit: boolean }[]> {
     if (manualQuests == null || manualQuests.length === 0) {
         return []
     }
@@ -21,18 +21,21 @@ export async function checkManualQuest(
                 'in',
                 manualQuests.map((it) => it.id),
             )
-            .where('profile', '==', profile.profileId)
+            .where('profileId', '==', profile.profileId)
             .get()
     ).docs.map((it) => it.data()) as IQuestSubmission[]
 
     return manualQuests.map((quest) => {
         // users may have multiple submissions for one quest
-        const submited = userSubmissions.filter((it) => it.questId === quest.id)
-        const approved = submited.filter((it) => it.status === 'approved')
+        const submitted = userSubmissions.filter((it) => it.questId === quest.id)
+        const approved = submitted.filter((it) => it.status === 'approved')
         return {
             questId: quest.id,
-            submited: submited.length > 0,
+            submitted: submitted.length > 0,
             approved: approved.length > 0,
+            canSubmit:
+                submitted.length === submitted.filter((it) => it.status === 'rejected').length ||
+                submitted.length === 0,
         }
     })
 }
