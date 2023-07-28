@@ -3,11 +3,19 @@ import * as jsonwebtoken from 'jsonwebtoken'
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import { Connection, IntentScope, JsonRpcProvider, verifyMessage, toSingleSignaturePubkeyPair } from '@mysten/sui.js'
-import { LoginChallengeToken, LoginChallengeTokenEth, RequestContext, TokenPayload } from './types'
-import { getAllOwnedObjects, RPC } from './utils'
+import {
+    IProfile,
+    LoginChallengeToken,
+    LoginChallengeTokenEth,
+    RequestContext,
+    TaskRequest,
+    TokenPayload,
+} from './types'
+import { getAllOwnedObjects, RPC, sleep } from './utils'
 import { SiweMessage } from 'siwe'
 import { getFirstProfileName } from './ethereum'
-import { isProfileEVMOnly } from './firestore'
+import { isProfileEVMOnly, storeDoc } from './firestore'
+import admin from 'firebase-admin'
 
 const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
 
@@ -195,15 +203,69 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
         const profileName: string | null = await getFirstProfileName(publicKey)
 
         if (profileName) {
-            const isEVMProfile = await isProfileEVMOnly(profileName)
+            try {
+                const isEVMProfile = await isProfileEVMOnly(profileName)
 
-            if (isEVMProfile) {
+                if (isEVMProfile) {
+                    const df = await provider.getDynamicFieldObject({
+                        parentId: process.env.PROFILE_TABLE as string,
+                        name: { type: '0x1::string::String', value: profileName },
+                    })
+                    const profile = df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value
+                    profiles.push(profile)
+                }
+            } catch (e) {
+                // If firebase does not have evm profile, we should create it for the user
+                console.log(e)
+
                 const df = await provider.getDynamicFieldObject({
                     parentId: process.env.PROFILE_TABLE as string,
                     name: { type: '0x1::string::String', value: profileName },
                 })
-                const profile = df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value
-                profiles.push(profile)
+                const profileId = (df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value) ?? ''
+
+                if (profileId) {
+                    profiles.push(profileId)
+                    await storeDoc<IProfile>('users', profileId, {
+                        name: profileName,
+                        profileId: profileId,
+                        isEVM: true,
+                        chainId: '324',
+                    })
+                } else {
+                    const task: TaskRequest = {
+                        data: {
+                            action: 'createProfile',
+                            payload: { profileName },
+                        },
+                    }
+                    await admin.database().ref('/tasks').push(task)
+                    let shouldWait = true
+                    let waitedCount = 0
+
+                    while (shouldWait) {
+                        await sleep(waitedCount * 2000)
+                        const df = await provider.getDynamicFieldObject({
+                            parentId: process.env.NEXT_PUBLIC_RELEAP_PROFILE_INDEX_TABLE_ADDRESS ?? '',
+                            name: { type: '0x1::string::String', value: profileName },
+                        })
+                        const profile = df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value
+                        console.log('Found profile: ', profile)
+                        profiles.push(profileId)
+                        if (waitedCount > 10) {
+                            shouldWait = false
+                        } else if (profile) {
+                            await storeDoc<IProfile>('users', profileId, {
+                                name: profileName,
+                                profileId: profileId,
+                                isEVM: true,
+                                chainId: '324',
+                            })
+                            shouldWait = false
+                        }
+                        waitedCount++
+                    }
+                }
             }
         }
     }
