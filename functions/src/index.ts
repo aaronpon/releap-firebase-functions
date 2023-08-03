@@ -50,6 +50,7 @@ export const entrypoint = onRequest(
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         minInstances: 2,
         timeoutSeconds: 180,
+        memory: '1GiB',
     },
     async (req, res) => {
         if (req.method === 'OPTIONS') {
