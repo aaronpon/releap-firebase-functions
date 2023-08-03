@@ -166,7 +166,7 @@ export const entrypoint = onRequest(
     },
 )
 
-export const twitterPosting = pubsub.schedule('*/5 * * * *').onRun(async () => {
+export const twitterPosting = pubsub.schedule('*/2 * * * *').onRun(async () => {
     const profilesToScrap = await getTwitterScraperProfiles()
     await Promise.all(
         profilesToScrap.map(async (profile) => {
