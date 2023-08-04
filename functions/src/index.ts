@@ -165,9 +165,9 @@ export const entrypoint = onRequest(
     },
 )
 
-export const twitterPosting = onSchedule(
+export const twitterPostingV2 = onSchedule(
     {
-        schedule: '*/2 * * * *',
+        schedule: 'every 5 minutes',
         timeoutSeconds: 180,
     },
     async () => {
