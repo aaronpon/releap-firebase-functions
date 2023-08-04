@@ -57,7 +57,7 @@ export const Campaign = CreateCampaginInput.extend({
             id: z.string(),
             type: z.enum(['url', 'image', 'text'] as const),
             description: z.string(),
-            data: z.string(),
+            name: z.string(),
         })
         .array()
         .optional(),
@@ -73,6 +73,7 @@ export const ProfileQuest = z.object({
 export const QuestSubmission = QuestSubmissionInput.extend({
     wallet: z.string(),
     profileId: z.string(),
+    owner: z.string().optional(),
     status: z.enum(['pending', 'approved', 'rejected'] as const),
     createdAt: z.instanceof(Timestamp),
     updatedAt: z.instanceof(Timestamp).optional(),

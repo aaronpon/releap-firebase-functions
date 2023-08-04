@@ -420,8 +420,25 @@ export const submitQuest = async (ctx: RequestContext, req: Request, res: Respon
         return
     }
 
+    const [existingSubmission, campaign] = (await Promise.all([
+        db
+            .collection('questSubmission')
+            .where('badgeId', '==', badgeId)
+            .where('questId', '==', questId)
+            .where('profileId', '==', profileId)
+            .where('status', 'in', ['pending', 'approved'])
+            .get(),
+        db.collection('badgeId').where('badgeId', '==', badgeId).limit(1).get(),
+    ])) as [admin.firestore.QuerySnapshot<IQuestSubmission>, admin.firestore.QuerySnapshot<ICampaign>]
+
+    if (existingSubmission.size > 0) {
+        res.status(400).send('You already submitted this quest').end()
+        return
+    }
+
     const task: IQuestSubmission = {
         badgeId,
+        owner: campaign.docs[0].data().profileId,
         questId,
         wallet: publicKey,
         profileId,
@@ -430,7 +447,7 @@ export const submitQuest = async (ctx: RequestContext, req: Request, res: Respon
         createdAt: Timestamp.now(),
     }
 
-    await storeDoc<IQuestSubmission>('tasks', randomUUID(), task)
+    await storeDoc<IQuestSubmission>('questSubmission', randomUUID(), task)
 
     res.status(201).end()
 }
@@ -444,8 +461,7 @@ export const updateQuestSubmission = async (ctx: RequestContext, req: Request, r
     }
 
     const { submissionId, action } = req.body.data
-    const { role, profiles } = ctx
-
+    const { profiles } = ctx
     const submission = await getDoc<IQuestSubmission>('questSubmission', submissionId)
 
     if (submission == null) {
@@ -454,10 +470,11 @@ export const updateQuestSubmission = async (ctx: RequestContext, req: Request, r
     }
 
     const campaign = (
-        await db.collection('badgeId').where('manualQuests.questId', '==', submission.questId).limit(1).get()
+        await db.collection('badgeId').where('badgeId', '==', submission.badgeId).limit(1).get()
     ).docs[0].data() as ICampaign
 
-    if (!profiles.includes(campaign.profileId) && role != 'admin') {
+    if (!profiles.includes(campaign.profileId)) {
+        // && role != 'admin'
         res.status(401).send('Only campaign owner or admin can update quest submission').end()
         return
     }
