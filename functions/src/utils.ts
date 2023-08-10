@@ -1,4 +1,4 @@
-import { JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
+import { Connection, JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
@@ -110,4 +110,15 @@ export async function retry<T>(
         await sleep(options.retryDelayMs)
     }
     throw new Error('Retry limit exceeded')
+}
+
+export function getProvider() {
+    return new JsonRpcProvider(new Connection({ fullnode: RPC }))
+}
+
+export async function getDynamicFieldByName(address: string, fieldName: string, fieldType = '0x1::string::String') {
+    return await getProvider().getDynamicFieldObject({
+        parentId: address,
+        name: { value: fieldName, type: fieldType },
+    })
 }
