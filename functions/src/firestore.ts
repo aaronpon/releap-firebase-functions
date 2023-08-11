@@ -6,7 +6,7 @@ import { Response } from 'express'
 import { RequestContext, IQuestSubmission, IProfile, ICampaign, IEvent, IPost, IComment, IBadge, IPoint } from './types'
 import { QuestSubmissionInput, ApproveQuestInput, CreateCampaginInput } from './inputType'
 
-import { DocumentData, Timestamp } from 'firebase-admin/firestore'
+import { DocumentData, Timestamp, WhereFilterOp } from 'firebase-admin/firestore'
 import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
 import { assignRole } from './discord'
 
@@ -26,6 +26,33 @@ export const updateLastScrap = async (profileName: string, createdAt: string) =>
 export async function getDoc<T>(collection: string, docId: string): Promise<T> {
     const ref = db.collection(collection).doc(docId)
     return (await ref.get()).data() as T
+}
+
+export async function getDocs<T>(
+    collection: string,
+    {
+        filters = [],
+        orderBy,
+        descending = true,
+        skip = 0,
+        limit = 0,
+    }: {
+        filters?: { path: keyof T; value: any; ops: WhereFilterOp }[]
+        orderBy: keyof T
+        descending: boolean
+        skip: number
+        limit: number
+    },
+): Promise<T[]> {
+    let ref = db.collection(collection).orderBy(orderBy as string, descending ? 'desc' : 'asc')
+
+    filters.forEach((filter) => {
+        ref = ref.where(filter.path as string, filter.ops, filter.value)
+    })
+
+    ref = ref.offset(skip).limit(limit)
+
+    return (await ref.get()).docs.map((it) => it.data()) as T[]
 }
 
 export async function storeDoc<T extends DocumentData>(collection: string, docId: string, data: T) {

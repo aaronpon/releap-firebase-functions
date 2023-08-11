@@ -27,7 +27,7 @@ export const ProposalInput = Proposal.extend({
 })
 
 export const Voting = z.object({
-    proposalId: z.string(),
+    proposal: Proposal,
     quorum: z.number(),
     startTime: z.number(),
     endTime: z.number(),
@@ -50,9 +50,11 @@ export const Vote = z.object({
 })
 
 export const VoteInput = Vote.extend({ veReapAmount: z.undefined(), votedAt: z.undefined() })
+export const VotingInput = Voting.extend({ proposal: z.undefined(), proposalId: z.string() })
 
 export type IProposalInput = z.infer<typeof ProposalInput>
 export type IProposal = z.infer<typeof Proposal>
 export type IVoting = z.infer<typeof Voting>
+export type IVotingInput = z.infer<typeof VotingInput>
 export type IVote = z.infer<typeof Vote>
 export type IVoteInput = z.infer<typeof VoteInput>

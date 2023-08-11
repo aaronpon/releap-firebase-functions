@@ -1,8 +1,8 @@
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import { randomUUID } from 'crypto'
-import { IProposal, IVote, IVoting, ProposalInput, VoteInput, Voting } from './types'
-import { getDoc, storeDoc } from '../firestore'
+import { IProposal, IVote, IVoting, IVotingInput, ProposalInput, VoteInput, Voting, VotingInput } from './types'
+import { getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 
 const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? []
@@ -49,24 +49,24 @@ export async function createProposal(req: Request, res: Response) {
 }
 
 export async function createVoting(req: Request, res: Response) {
-    const result = await Voting.safeParseAsync(req.body.data)
+    const result = await VotingInput.safeParseAsync(req.body.data)
 
     if (!result.success) {
         res.status(400).send(result.error.message)
         return
     }
 
-    const voting: IVoting = {
+    const votingInput: IVotingInput = {
         ...result.data,
     }
 
     const signatureVerifed = verifySignature({
         data: {
-            proposalId: voting.proposalId,
+            proposalId: votingInput.proposalId,
         },
-        chainId: voting.chainId,
-        wallet: voting.creator,
-        signature: voting.signature,
+        chainId: votingInput.chainId,
+        wallet: votingInput.creator,
+        signature: votingInput.signature,
     })
 
     if (!signatureVerifed) {
@@ -74,19 +74,60 @@ export async function createVoting(req: Request, res: Response) {
         return
     }
 
-    if (!GOVERNANCE_ADMIN.includes(voting.creator)) {
+    if (!GOVERNANCE_ADMIN.includes(votingInput.creator)) {
         res.status(401).send('Access denied')
         return
     }
 
-    await storeDoc<IVoting>('voting', voting.proposalId, voting)
+    const proposal = await getDoc<IProposal>('proposal', votingInput.proposalId)
+
+    if (proposal == null) {
+        res.status(400).send('Proposal not found')
+        return
+    }
+
+    const voting: IVoting = {
+        ...votingInput,
+        proposal,
+    }
+
+    await storeDoc<IVoting>('voting', votingInput.proposalId, voting)
 }
 
 export async function getVotings(req: Request, res: Response) {
     const { id, skip, limit } = req.query
-    if (id) {
+    if (id && typeof id === 'string') {
+        const voting = await getDoc<IVoting>('voting', id)
+        res.json([voting])
     } else {
+        const skipStr = typeof skip === 'string' ? skip : '0'
+        const limitStr = typeof limit === 'string' ? limit : '20'
+        const skip_ = parseInt(skipStr)
+        const limit_ = Math.min(20, parseInt(limitStr))
+        const votings = await getDocs<IVoting>('voting', {
+            orderBy: 'createdAt',
+            descending: true,
+            skip: skip_,
+            limit: limit_,
+        })
+        res.json(votings)
     }
+}
+
+export async function getVotes(req: Request, res: Response) {
+    const { proposalId, skip, limit } = req.query
+    const skipStr = typeof skip === 'string' ? skip : '0'
+    const limitStr = typeof limit === 'string' ? limit : '20'
+    const skip_ = parseInt(skipStr)
+    const limit_ = Math.min(20, parseInt(limitStr))
+    const votes = await getDocs<IVote>('vote', {
+        filters: [{ path: 'proposalId', ops: '==', value: proposalId }],
+        orderBy: 'votedAt',
+        descending: true,
+        skip: skip_,
+        limit: limit_,
+    })
+    res.json(votes)
 }
 
 export async function createVote(req: Request, res: Response) {

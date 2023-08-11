@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https'
 
 import * as logger from 'firebase-functions/logger'
-import { createProposal, createVote, getVotings } from './functions'
+import { createProposal, createVote, getVotes, getVotings } from './functions'
 
 export const governance = onRequest(
     {
@@ -44,5 +44,19 @@ export const votings = onRequest(
             return
         }
         getVotings(req, res)
+    },
+)
+
+export const votes = onRequest(
+    {
+        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
+        timeoutSeconds: 180,
+    },
+    async (req, res) => {
+        if (req.method === 'OPTIONS') {
+            res.status(200).end()
+            return
+        }
+        getVotes(req, res)
     },
 )
