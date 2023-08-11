@@ -88,6 +88,7 @@ export const Profile = z.object({
     chainId: z.string().optional().nullable(),
     discordId: z.string().optional().nullable(),
     discordHandle: z.string().optional().nullable(),
+    activeWallet: z.string().optional().nullable(),
 })
 
 export type IProfile = z.infer<typeof Profile>
@@ -115,7 +116,6 @@ export interface LoginChallengeTokenEth {
 
 export interface TokenPayload {
     publicKey: string
-    role: 'admin' | 'user'
     profiles: string[]
     isEth: boolean
 }
@@ -123,7 +123,6 @@ export interface TokenPayload {
 export interface AppContext {
     publicKey: string
     profiles: string[]
-    role: 'admin' | 'user'
     isEth: boolean
     provider: JsonRpcProvider
     adminPublicKey: string
@@ -237,4 +236,9 @@ export interface User {
 export interface DiscordServer {
     serverId: string
     ownerProfile: string
+}
+
+export interface IWallet {
+    address: string
+    veReap: number
 }

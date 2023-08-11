@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https'
 
 import * as logger from 'firebase-functions/logger'
-import { createProposal, createVote, getVotes, getVotings } from './functions'
+import { createProposal, createVote, createVoting, getVotes, getVotings } from './functions'
 
 export const governance = onRequest(
     {
@@ -21,7 +21,7 @@ export const governance = onRequest(
                 break
             // admin only
             case 'createVoting':
-                createProposal(req, res)
+                createVoting(req, res)
                 break
             case 'createVote':
                 createVote(req, res)

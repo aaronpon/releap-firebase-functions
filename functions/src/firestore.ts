@@ -55,9 +55,9 @@ export async function getDocs<T>(
     return (await ref.get()).docs.map((it) => it.data()) as T[]
 }
 
-export async function storeDoc<T extends DocumentData>(collection: string, docId: string, data: T) {
+export async function storeDoc<T extends DocumentData>(collection: string, docId: string, data: Partial<T>) {
     const ref = db.collection(collection).doc(docId)
-    return await ref.set(data)
+    return await ref.set(data, { merge: true })
 }
 
 export async function findProfileOwnerCap(profile: string) {
@@ -131,7 +131,7 @@ export const isProfileEVMOnly = async (profileName: string): Promise<boolean> =>
 export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
     const { name, profileId, isEVM, chainId } = req.body.data
 
-    await storeDoc<IProfile>('users', profileId, { name, profileId, isEVM, chainId })
+    await storeDoc<IProfile>('users', profileId, { name, profileId, isEVM, chainId, activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }
@@ -146,6 +146,7 @@ export const createPost = async (ctx: RequestContext, req: Request, res: Respons
 
     const timeStamp = Timestamp.now()
     await storeDoc<IPost>('posts', postId, { postId, profileId, timeStamp })
+    await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }
@@ -168,6 +169,7 @@ export const createComment = async (ctx: RequestContext, req: Request, res: Resp
         postId,
         timeStamp,
     })
+    await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }
@@ -189,6 +191,7 @@ export const followProfile = async (ctx: RequestContext, req: Request, res: Resp
         postId: null,
         timeStamp,
     })
+    await storeDoc<IProfile>('users', followerId, { activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }
@@ -209,6 +212,7 @@ export const likePost = async (ctx: RequestContext, req: Request, res: Response)
         post: postId,
         timeStamp,
     })
+    await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }
@@ -230,6 +234,7 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
         postId: commentId,
         timeStamp,
     })
+    await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }
@@ -243,6 +248,7 @@ export const updateLastActivity = async (ctx: RequestContext, req: Request, res:
     }
 
     await db.collection('users').doc(profileId).update({ lastActivity: Timestamp.now() })
+    await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
     res.status(201).end()
 }

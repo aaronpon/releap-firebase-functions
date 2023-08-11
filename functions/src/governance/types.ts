@@ -4,6 +4,8 @@ export const Choice = z.object({
     title: z.string(),
     description: z.string(),
     choiceId: z.string(),
+    veReap: z.number().optional(),
+    voter: z.number().optional(),
 })
 
 export const ChoiceInput = Choice.extend({

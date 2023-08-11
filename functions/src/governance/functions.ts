@@ -2,23 +2,31 @@ import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import { randomUUID } from 'crypto'
 import { IProposal, IVote, IVoting, IVotingInput, ProposalInput, VoteInput, VotingInput } from './types'
-import { getDoc, getDocs, storeDoc } from '../firestore'
+import { db, getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 
-const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? []
+const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
+    '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
+]
 
 export async function createProposal(req: Request, res: Response) {
     const result = await ProposalInput.safeParseAsync(req.body.data)
 
     if (!result.success) {
-        res.status(400).send(result.error.message)
+        res.status(400).json(result.error.format())
         return
     }
 
     const data = result.data
 
     const signatureVerifed = verifySignature({
-        data: {},
+        data: {
+            title: data.title,
+            description: data.description,
+            choices: data.choices,
+            createdAt: data.createdAt,
+            creator: data.creator,
+        },
         chainId: data.chainId,
         wallet: data.creator,
         signature: data.signature,
@@ -46,6 +54,8 @@ export async function createProposal(req: Request, res: Response) {
     }
 
     await storeDoc<IProposal>('proposal', proposal.proposalId, proposal)
+
+    res.status(201).json(proposal)
 }
 
 export async function createVoting(req: Request, res: Response) {
@@ -92,6 +102,8 @@ export async function createVoting(req: Request, res: Response) {
     }
 
     await storeDoc<IVoting>('voting', votingInput.proposalId, voting)
+
+    res.status(201).json(voting)
 }
 
 export async function getVotings(req: Request, res: Response) {
@@ -148,7 +160,7 @@ export async function createVote(req: Request, res: Response) {
         return
     }
 
-    if (!proposal.choices.some((choice) => choice.choiceId === data.choiceId)) {
+    if (!proposal.choices.some((choice) => choice.choiceId === data.choiceId && choice.title === data.choiceTitle)) {
         res.status(400).send('Invalid choiceId')
         return
     }
@@ -201,5 +213,22 @@ export async function createVote(req: Request, res: Response) {
         return
     }
 
-    await storeDoc<IVote>('vote', `${vote.proposalId}.${vote.walletAddress}`, vote)
+    const ref = db.collection('voting').doc(data.proposalId)
+
+    await db.runTransaction(
+        async (tx) => {
+            const voting = (await tx.get(ref)).data() as IVoting
+            voting.proposal.choices.forEach((choice) => {
+                if (choice.choiceId === data.choiceId) {
+                    choice.veReap = (choice.veReap ?? 0) + vote.veReapAmount
+                    choice.voter = (choice.voter ?? 0) + 1
+                }
+            })
+            tx.set(ref, voting)
+            tx.set(db.collection('vote').doc(`${vote.proposalId}.${vote.walletAddress}`), vote)
+        },
+        { maxAttempts: 100 },
+    )
+
+    res.status(201).json(vote)
 }

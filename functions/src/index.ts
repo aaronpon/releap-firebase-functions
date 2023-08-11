@@ -36,6 +36,7 @@ import * as discord from './discord'
 import { rebalanceGas } from './task'
 
 export { taskCreated } from './task'
+export { governance, votes, votings } from './governance'
 
 export const entrypoint = onRequest(
     {
