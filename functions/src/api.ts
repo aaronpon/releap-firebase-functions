@@ -11,7 +11,7 @@ const apikeys = [
     { token: 'apify_api_kkOyeZBCaxZIQL89Odagqmw55O98io0GOs00', client: 'guiltless_shrub/twitter-scraper' },
 ]
 
-const activeAccount = 1
+const activeAccount = 0
 
 const client = new ApifyClient({
     token: apikeys[activeAccount].token,
@@ -24,7 +24,10 @@ export const scrapeProfile = async (twitterProfileName: string): Promise<ApifyTw
         addUserInfo: false,
         profileMode: 'replies',
         tweetsDesired: 100,
-        usernames: [twitterProfileName],
+        proxyConfig: {
+            useApifyProxy: true,
+        },
+        handles: [twitterProfileName],
     })
 
     const { items }: any = await client.dataset(run.defaultDatasetId).listItems()
