@@ -46,7 +46,7 @@ export const Point = z.object({
     badgeId: z.string(),
     minter: z.string(),
     campaignProfile: z.string(),
-    point: z.number(),
+    points: z.number(),
     timeStamp: z.instanceof(Timestamp),
 })
 

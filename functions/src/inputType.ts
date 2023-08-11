@@ -21,7 +21,7 @@ export const CreateCampaginInput = z.object({
     profileId: z.string(),
     mintList: z.string().array().optional(),
     order: z.number().optional(),
-    point: z.number().optional(),
+    points: z.number().optional(),
     type: z.string().optional(),
     twitterQuest: z
         .object({
