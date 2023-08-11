@@ -1,7 +1,7 @@
 import { Request } from 'firebase-functions/v2/https'
 import { Response } from 'express'
 import { randomUUID } from 'crypto'
-import { IProposal, IVote, IVoting, IVotingInput, ProposalInput, VoteInput, Voting, VotingInput } from './types'
+import { IProposal, IVote, IVoting, IVotingInput, ProposalInput, VoteInput, VotingInput } from './types'
 import { getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 
