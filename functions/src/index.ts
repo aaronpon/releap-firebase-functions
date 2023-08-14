@@ -1,6 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { onSchedule } from 'firebase-functions/v2/scheduler'
-import { pubsub } from 'firebase-functions'
 import * as logger from 'firebase-functions/logger'
 import admin from 'firebase-admin'
 
@@ -166,55 +165,61 @@ export const entrypoint = onRequest(
     },
 )
 
-export const twitterPosting = pubsub.schedule('*/5 * * * *').onRun(async () => {
-    const profilesToScrap = await getTwitterScraperProfiles()
-    await Promise.all(
-        profilesToScrap.map(async (profile) => {
-            const lastUpdate = profile.lastUpdate
+export const twitterPostingV2 = onSchedule(
+    {
+        schedule: 'every 5 minutes',
+        timeoutSeconds: 180,
+    },
+    async () => {
+        const profilesToScrap = await getTwitterScraperProfiles()
+        await Promise.all(
+            profilesToScrap.map(async (profile) => {
+                const lastUpdate = profile.lastUpdate
 
-            logger.info(`Scraping profiles: ${profile.twitter}, last update at ${lastUpdate}`)
+                logger.info(`Scraping profiles: ${profile.twitter}, last update at ${lastUpdate}`)
 
-            const response: ApifyTwitterRes[] = await scrapeTweets(profile.twitter)
+                const response: ApifyTwitterRes[] = await scrapeTweets(profile.twitter)
 
-            await updateLastScrape(profile.name, new Date().toISOString())
+                await updateLastScrape(profile.name, new Date().toISOString())
 
-            await Promise.all(
-                response.map(async (tweet) => {
-                    if (new Date(tweet.created_at) > new Date(lastUpdate)) {
-                        logger.info(`Got Tweet: ${profile.twitter}, ${tweet.full_text}`)
+                await Promise.all(
+                    response.map(async (tweet) => {
+                        if (new Date(tweet.created_at) > new Date(lastUpdate) && !tweet.full_text.includes('RT')) {
+                            logger.info(`Got Tweet: ${profile.twitter}, ${tweet.full_text}`)
 
-                        const mediaUrl =
-                            tweet.media.length > 0
-                                ? tweet.media[0]?.video_url == null
-                                    ? tweet.media[0].media_url
-                                    : tweet.media[0].video_url.split('.mp4')[0] + '.mp4'
-                                : ''
+                            const mediaUrl =
+                                tweet.media.length > 0
+                                    ? tweet.media[0]?.video_url == null
+                                        ? tweet.media[0].media_url
+                                        : tweet.media[0].video_url.split('.mp4')[0] + '.mp4'
+                                    : ''
 
-                        const res: any = await adminCreatePost(
-                            profile.profileId,
-                            mediaUrl,
-                            tweet.full_text.replace(/https:\/\/t\.co\S*/g, ''),
-                        )
+                            const res: any = await adminCreatePost(
+                                profile.profileId,
+                                mediaUrl,
+                                tweet.full_text.replace(/https:\/\/t\.co\S*/g, ''),
+                            )
 
-                        const createdPostId =
-                            res.effects?.created?.find((it: any) => {
-                                if (typeof it.owner === 'object' && 'Shared' in it.owner) {
-                                    return it.owner.Shared.initial_shared_version === it.reference.version
-                                }
-                                return ''
-                            })?.reference?.objectId ?? ''
+                            const createdPostId =
+                                res.effects?.created?.find((it: any) => {
+                                    if (typeof it.owner === 'object' && 'Shared' in it.owner) {
+                                        return it.owner.Shared.initial_shared_version === it.reference.version
+                                    }
+                                    return ''
+                                })?.reference?.objectId ?? ''
 
-                        await admin.firestore().collection('posts').doc(createdPostId).create({
-                            postId: createdPostId,
-                            timeStamp: admin.firestore.FieldValue.serverTimestamp(),
-                            profileId: profile.profileId,
-                        })
-                    }
-                }),
-            )
-        }),
-    )
-})
+                            await admin.firestore().collection('posts').doc(createdPostId).create({
+                                postId: createdPostId,
+                                timeStamp: admin.firestore.FieldValue.serverTimestamp(),
+                                profileId: profile.profileId,
+                            })
+                        }
+                    }),
+                )
+            }),
+        )
+    },
+)
 
 export const rebalance = onSchedule(
     {
