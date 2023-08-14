@@ -72,7 +72,9 @@ export function getVeReapProjectedBalance(lock?: VeReapLockInfo | null | undefin
         const veReap = parseInt(lock.vereap)
         const lockedDuration = start + lockTime > now ? now - start : lockTime
 
-        return (veReap * (lockTime - lockedDuration)) / lockTime
+        const result = (veReap * (lockTime - lockedDuration)) / lockTime
+
+        return isNaN(result) ? 0 : result
     }
 }
 
