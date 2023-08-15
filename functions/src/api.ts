@@ -9,9 +9,10 @@ const apikeys = [
         client: 'inalienable_pony/twitter-profile-tweets-scraper-temp-fix',
     },
     { token: 'apify_api_kkOyeZBCaxZIQL89Odagqmw55O98io0GOs00', client: 'guiltless_shrub/twitter-scraper' },
+    { token: 'apify_api_yh34WQDa8rijet2UDwBmcuodjZ03EG3dA2QF', client: 'scrupulous_nut/twitter-scraper-task' },
 ]
 
-const activeAccount = 1
+const activeAccount = 3
 
 const client = new ApifyClient({
     token: apikeys[activeAccount].token,
@@ -24,7 +25,10 @@ export const scrapeProfile = async (twitterProfileName: string): Promise<ApifyTw
         addUserInfo: false,
         profileMode: 'replies',
         tweetsDesired: 100,
-        usernames: [twitterProfileName],
+        proxyConfig: {
+            useApifyProxy: true,
+        },
+        handles: [twitterProfileName],
     })
 
     const { items }: any = await client.dataset(run.defaultDatasetId).listItems()
