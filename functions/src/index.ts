@@ -39,6 +39,7 @@ import { errorCaptured } from './utils'
 
 export { taskCreated } from './task'
 export { governance, votes, votings } from './governance'
+export { curation } from './curation'
 
 export const entrypoint = onRequest(
     {
