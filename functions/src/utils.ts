@@ -1,4 +1,7 @@
 import { Connection, JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
+import { Response } from 'express'
+import { Request } from 'firebase-functions/v2/https'
+import { errorHandler } from './error'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
@@ -121,4 +124,14 @@ export async function getDynamicFieldByName(address: string, fieldName: string, 
         parentId: address,
         name: { value: fieldName, type: fieldType },
     })
+}
+
+export function errorCaptured(handler: (req: Request, res: Response) => Promise<void> | void) {
+    return async (req: Request, res: Response) => {
+        try {
+            await handler(req, res)
+        } catch (error) {
+            errorHandler(error, res)
+        }
+    }
 }

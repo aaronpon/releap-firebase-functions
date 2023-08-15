@@ -5,21 +5,20 @@ import { REST } from 'discord.js'
 import { API } from '@discordjs/core'
 import { VerifyDiscordServerInput } from './inputType'
 import { getDoc, storeDoc } from './firestore'
+import { AuthError, BadRequest } from './error'
 
 export async function verifyDiscordServer(ctx: RequestContext, req: Request, res: Response) {
     const parseResult = await VerifyDiscordServerInput.safeParseAsync(req.body.data)
 
     if (!parseResult.success) {
-        res.status(400).send(parseResult.error.message).end()
-        return
+        throw new BadRequest(parseResult.error.message)
     }
 
     const { profileId, discordServerId, roleId } = parseResult.data
 
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const serverVerified = await verifiyDiscordServerAccess(discordServerId, profileId)
@@ -28,7 +27,7 @@ export async function verifyDiscordServer(ctx: RequestContext, req: Request, res
     if (serverVerified && roleVerified) {
         res.status(200).json({ success: true }).end()
     } else {
-        res.status(400).send('Fail to fetch discord server indo').end()
+        throw new BadRequest('Fail to fetch discord server info')
     }
 }
 

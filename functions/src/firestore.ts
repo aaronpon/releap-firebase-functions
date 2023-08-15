@@ -9,6 +9,7 @@ import { QuestSubmissionInput, ApproveQuestInput, CreateCampaginInput } from './
 import { DocumentData, Timestamp, WhereFilterOp } from 'firebase-admin/firestore'
 import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
 import { assignRole } from './discord'
+import { AuthError, BadRequest, NotFoundError, ServerError } from './error'
 
 export const db = admin.firestore()
 db.settings({ ignoreUndefinedProperties: true })
@@ -140,8 +141,7 @@ export const createPost = async (ctx: RequestContext, req: Request, res: Respons
     const { postId, profileId } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const timeStamp = Timestamp.now()
@@ -155,8 +155,7 @@ export const createComment = async (ctx: RequestContext, req: Request, res: Resp
     const { postId, parentId, profileId, parentProfileId } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const timeStamp = Timestamp.now()
@@ -178,8 +177,7 @@ export const followProfile = async (ctx: RequestContext, req: Request, res: Resp
     const { followeeId, followerId } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(followerId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const timeStamp = Timestamp.now()
@@ -200,8 +198,7 @@ export const likePost = async (ctx: RequestContext, req: Request, res: Response)
     const { profileId, postId, postAuthorId } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const timeStamp = Timestamp.now()
@@ -221,8 +218,7 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
     const { profileId, postId, commentId, postAuthorId } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const timeStamp = Timestamp.now()
@@ -243,8 +239,7 @@ export const updateLastActivity = async (ctx: RequestContext, req: Request, res:
     const { profileId } = req.body.data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     await db.collection('users').doc(profileId).update({ lastActivity: Timestamp.now() })
@@ -258,23 +253,20 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
     const { profiles } = ctx
     //const { profiles, provider, publicKey } = ctx
     if (!profiles.includes(minterProfile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const mintedBadge = await getDoc<IBadge>('badges', createdBadgeId)
 
     if (mintedBadge != null) {
-        res.status(400).send('The badge already created').end()
-        return
+        throw new BadRequest('The badge already created')
     }
 
     const badge = await getDoc<ICampaign>('badgeId', badgeId)
     const profile = await getDoc<IProfile>('users', minterProfile)
 
     if (badge == null) {
-        res.status(400).send('Invaild badge').end()
-        return
+        throw new BadRequest('Invalid badge')
     }
 
     try {
@@ -286,25 +278,21 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
             options: { showType: true, showBcs: false, showOwner: true, showContent: false, showDisplay: false },
         })
         if (error != null || data == null) {
-            res.status(400).send('Fail to get badge from chain').end()
-            return
+            throw new BadRequest('Fail to get badge from chain')
         }
         if (!data.type?.match(/releap_badge/)) {
-            res.status(400).send('Incorrect data type').end()
-            return
+            throw new BadRequest('Incorrect data type')
         }
 
         const isVaildOwner =
             typeof data.owner === 'object' && 'AddressOwner' in data.owner && data.owner?.AddressOwner === publicKey
 
         if (!isVaildOwner) {
-            res.status(400).send('Incorrect owner').end()
-            return
+            throw new BadRequest('Incorrect owner')
         }
         */
     } catch (err) {
-        res.status(400).send('Fail to get badge from chain').end()
-        return
+        throw new ServerError('Fail to get badge from chain')
     }
 
     const timeStamp = Timestamp.now()
@@ -343,8 +331,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
     const result = await CreateCampaginInput.passthrough().safeParseAsync(req.body.data)
 
     if (!result.success) {
-        res.status(400).send(result.error.message)
-        return
+        throw new BadRequest(result.error.message)
     }
     const {
         badgeId,
@@ -366,15 +353,13 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
     const { profiles } = ctx
 
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const existing = await getDoc<ICampaign>('badgeId', badgeId)
 
     if (existing != null && existing.profileId !== profileId) {
-        res.status(401).send("You don't own this badge").end()
-        return
+        throw new AuthError("You don't own this badge")
     }
 
     const timeStamp = Timestamp.now()
@@ -410,15 +395,13 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
     const { badgeId, profileId } = req.body.data
     const { profiles, publicKey, provider } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const profile = await getDoc<IProfile>('users', profileId)
 
     if (profile == null) {
-        res.status(404).send('Profile not found').end()
-        return
+        throw new NotFoundError('Profile not found')
     }
 
     const { twitterQuest, suiQuests, manualQuests } = (await getDoc<ICampaign>('badgeId', badgeId)) ?? {}
@@ -441,16 +424,14 @@ export const submitQuest = async (ctx: RequestContext, req: Request, res: Respon
     const parseResult = await QuestSubmissionInput.safeParseAsync(req.body.data)
 
     if (!parseResult.success) {
-        res.status(400).send(parseResult.error.message).end()
-        return
+        throw new BadRequest(parseResult.error.message)
     }
 
     const { questId, data, badgeId, profileId } = parseResult.data
     const { profiles, publicKey } = ctx
 
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const [existingSubmission, campaign] = (await Promise.all([
@@ -465,8 +446,7 @@ export const submitQuest = async (ctx: RequestContext, req: Request, res: Respon
     ])) as [admin.firestore.QuerySnapshot<IQuestSubmission>, admin.firestore.QuerySnapshot<ICampaign>]
 
     if (existingSubmission.size > 0) {
-        res.status(400).send('You already submitted this quest').end()
-        return
+        throw new BadRequest('You already submitted this quest')
     }
 
     const task: IQuestSubmission = {
@@ -489,8 +469,7 @@ export const updateQuestSubmission = async (ctx: RequestContext, req: Request, r
     const parseResult = await ApproveQuestInput.safeParseAsync(req.body.data)
 
     if (!parseResult.success) {
-        res.status(400).send(parseResult.error.message).end()
-        return
+        throw new BadRequest(parseResult.error.message)
     }
 
     const { submissionId, action } = req.body.data
@@ -498,8 +477,7 @@ export const updateQuestSubmission = async (ctx: RequestContext, req: Request, r
     const submission = await getDoc<IQuestSubmission>('questSubmission', submissionId)
 
     if (submission == null) {
-        res.status(404).end()
-        return
+        throw new NotFoundError()
     }
 
     const campaign = (
@@ -508,8 +486,7 @@ export const updateQuestSubmission = async (ctx: RequestContext, req: Request, r
 
     if (!profiles.includes(campaign.profileId)) {
         // && role != 'admin'
-        res.status(401).send('Only campaign owner or admin can update quest submission').end()
-        return
+        throw new AuthError('Only campaign owner or admin can update quest submission')
     }
 
     await storeDoc<IQuestSubmission>('questSubmission', submissionId, {

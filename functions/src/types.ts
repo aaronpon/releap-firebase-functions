@@ -2,6 +2,7 @@ import { JsonRpcProvider, RawSigner, SuiTransactionBlockResponse } from '@mysten
 import { Timestamp } from 'firebase-admin/firestore'
 import z from 'zod'
 import { CreateCampaginInput, QuestSubmissionInput } from './inputType'
+import { CurationList } from './curation/types'
 
 // DB Schema ====================================================
 /*
@@ -89,6 +90,7 @@ export const Profile = z.object({
     discordId: z.string().optional().nullable(),
     discordHandle: z.string().optional().nullable(),
     activeWallet: z.string().optional().nullable(),
+    curationList: CurationList.optional().nullable(),
 })
 
 export type IProfile = z.infer<typeof Profile>

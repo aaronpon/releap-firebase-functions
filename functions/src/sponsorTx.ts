@@ -12,6 +12,7 @@ import { checkAddressOwnsProfileName } from './ethereum'
 import { JsonRpcProvider, Connection } from '@mysten/sui.js'
 import { findProfileOwnerCap, setProfileOwnerCap } from './firestore'
 import * as logger from 'firebase-functions/logger'
+import { AuthError, ServerError } from './error'
 
 globalThis.fetch = fetch as any
 
@@ -37,7 +38,7 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     const profile = (df.data?.content?.dataType === 'moveObject' && df.data.content.fields.value) ?? ''
 
     if (profile) {
-        res.status(401).send('Profile Exists on Sui').end()
+        throw new AuthError('Profile Exists on Sui')
     }
 
     if (isEth && profileName) {
@@ -48,7 +49,7 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
                 if (waitedCount > 10) {
                     shouldWait = false
                     logger.error("You don't own this profile name on EVM Chain")
-                    res.status(401).send("You don't own this profile name on EVM Chain").end()
+                    throw new AuthError("You don't own this profile name on EVM Chain")
                 } else if (ownsProfile) {
                     shouldWait = false
                 }
@@ -65,23 +66,21 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     res.status(201).json(result)
 }
 
-export const updateProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+export const updateProfile = async (ctx: RequestContext, req: Request, _res: Response) => {
     const { profiles } = ctx
     const { profile } = req.body.data
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
-    res.status(500).send('WIP').end()
+    throw new ServerError('WIP')
 }
 
 export const createPost = async (ctx: RequestContext, req: Request, res: Response) => {
     const { profiles } = ctx
     const { profile, imageUrl, content } = req.body.data
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const task: TaskRequest = {
@@ -112,8 +111,7 @@ export const createComment = async (ctx: RequestContext, req: Request, res: Resp
     const { post, profile, content } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const task: TaskRequest = {
@@ -132,8 +130,7 @@ export const likePost = async (ctx: RequestContext, req: Request, res: Response)
     const { profile, post } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const task: TaskRequest = {
@@ -152,8 +149,7 @@ export const unlikePost = async (ctx: RequestContext, req: Request, res: Respons
     const { profile, post } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const task: TaskRequest = {
@@ -172,8 +168,7 @@ export const followProfile = async (ctx: RequestContext, req: Request, res: Resp
     const { followingProfile, profile } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
     const task: TaskRequest = {
         data: {
@@ -191,8 +186,7 @@ export const unfollowProfile = async (ctx: RequestContext, req: Request, res: Re
     const { followingProfile, profile } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const task: TaskRequest = {
@@ -211,15 +205,13 @@ export const updateProfileImage = async (ctx: RequestContext, req: Request, res:
     const { imageUrl, profile } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const profileOwnerCap = await findAndSetProfileOwnerCap(provider, adminPublicKey, profile)
 
     if (profileOwnerCap == null) {
-        res.status(500).send('Fail to find profileOwnerCap').end()
-        return
+        throw new ServerError('Fail to find profileOwnerCap')
     }
 
     const task: TaskRequest = {
@@ -238,14 +230,12 @@ export const updateProfileCover = async (ctx: RequestContext, req: Request, res:
     const { coverUrl, profile } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
     const profileOwnerCap = await findAndSetProfileOwnerCap(provider, adminPublicKey, profile)
 
     if (profileOwnerCap == null) {
-        res.status(500).send('Fail to find profileOwnerCap').end()
-        return
+        throw new ServerError('Fail to find profileOwnerCap')
     }
 
     const task: TaskRequest = {
@@ -264,15 +254,13 @@ export const updateProfileDescription = async (ctx: RequestContext, req: Request
     const { description, profile } = req.body.data
 
     if (!profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const profileOwnerCap = await findAndSetProfileOwnerCap(provider, adminPublicKey, profile)
 
     if (profileOwnerCap == null) {
-        res.status(500).send('Fail to find profileOwnerCap').end()
-        return
+        throw new ServerError('Fail to find profileOwnerCap')
     }
 
     const task: TaskRequest = {

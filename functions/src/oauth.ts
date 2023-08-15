@@ -6,6 +6,7 @@ import axios from 'axios'
 import * as logger from 'firebase-functions/logger'
 import { updateUserDiscordData, updateUserTwitterData } from './firestore'
 import { RequestContext } from './types'
+import { AuthError } from './error'
 
 async function requestTwitterAccessToken({ oauthToken, oauthVerifier }: { oauthToken: string; oauthVerifier: string }) {
     const twitterOauth: OAuth = new OAuth({
@@ -108,8 +109,7 @@ export async function requestTwitterOAuthCode(ctx: RequestContext, req: Request,
 export async function connectTwitter(ctx: RequestContext, req: Request, res: Response) {
     const { profile, oauthToken, oauthVerifier } = req.body.data
     if (!ctx.profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     logger.info({ oauthToken, oauthVerifier })
@@ -126,8 +126,7 @@ export async function connectTwitter(ctx: RequestContext, req: Request, res: Res
 export async function disconnectTwitter(ctx: RequestContext, req: Request, res: Response) {
     const { profile } = req.body.data
     if (!ctx.profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
     await updateUserTwitterData(profile, null, null)
     res.status(200).json({ success: true })
@@ -150,8 +149,7 @@ interface DiscordProfileResponse {
 export async function connectDiscord(ctx: RequestContext, req: Request, res: Response) {
     const { code, redirectUri, profile } = req.body.data
     if (!ctx.profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
     try {
         const data = new URLSearchParams()

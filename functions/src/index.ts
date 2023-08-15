@@ -34,6 +34,8 @@ import * as firestore from './firestore'
 import * as oauth from './oauth'
 import * as discord from './discord'
 import { rebalanceGas } from './task'
+import { BadRequest, ForbiddenError } from './error'
+import { errorCaptured } from './utils'
 
 export { taskCreated } from './task'
 export { governance, votes, votings } from './governance'
@@ -53,10 +55,9 @@ export const entrypoint = onRequest(
         timeoutSeconds: 180,
         memory: '1GiB',
     },
-    async (req, res) => {
-        if (req.method === 'OPTIONS') {
-            res.status(200).end()
-            return
+    errorCaptured(async (req, res) => {
+        if (req.method !== 'POST') {
+            throw new ForbiddenError('Method not allow')
         }
 
         logger.info(`Action: ${req.body.action}`, { data: req.body.data })
@@ -162,9 +163,9 @@ export const entrypoint = onRequest(
                 discord.verifyDiscordServer({} as any, req, res)
                 break
             default:
-                res.status(400).send('Unexpected action').end()
+                throw new BadRequest('Unexpected action')
         }
-    },
+    }),
 )
 
 export const twitterPosting = pubsub.schedule('*/5 * * * *').onRun(async () => {

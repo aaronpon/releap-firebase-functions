@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto'
 import { IProposal, IVote, IVoting, IVotingInput, ProposalInput, VoteInput, VotingInput } from './types'
 import { db, getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
+import { AuthError, BadRequest, NotFoundError } from '../error'
 
 const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
     '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
@@ -13,8 +14,7 @@ export async function createProposal(req: Request, res: Response) {
     const result = await ProposalInput.safeParseAsync(req.body.data)
 
     if (!result.success) {
-        res.status(400).json(result.error.format())
-        return
+        throw new BadRequest(result.error.message)
     }
 
     const data = result.data
@@ -33,13 +33,11 @@ export async function createProposal(req: Request, res: Response) {
     })
 
     if (!signatureVerifed) {
-        res.status(400).send('Invalid signature')
-        return
+        throw new BadRequest('Invalid signature')
     }
 
     if (!(await checkVeReapThreshold(data.chainId, data.creator))) {
-        res.status(400).send("You don't have enough veReap")
-        return
+        throw new BadRequest("You don't have enough veReap")
     }
 
     const proposal: IProposal = {
@@ -62,8 +60,7 @@ export async function createVoting(req: Request, res: Response) {
     const result = await VotingInput.safeParseAsync(req.body.data)
 
     if (!result.success) {
-        res.status(400).send(result.error.message)
-        return
+        throw new BadRequest(result.error.message)
     }
 
     const votingInput: IVotingInput = {
@@ -80,20 +77,17 @@ export async function createVoting(req: Request, res: Response) {
     })
 
     if (!signatureVerifed) {
-        res.status(400).send('Invalid signature')
-        return
+        throw new BadRequest('Invalid signature')
     }
 
     if (!GOVERNANCE_ADMIN.includes(votingInput.creator)) {
-        res.status(401).send('Access denied')
-        return
+        throw new AuthError('Access denied')
     }
 
     const proposal = await getDoc<IProposal>('proposal', votingInput.proposalId)
 
     if (proposal == null) {
-        res.status(400).send('Proposal not found')
-        return
+        throw new NotFoundError('Proposal not found')
     }
 
     const voting: IVoting = {
@@ -146,8 +140,7 @@ export async function createVote(req: Request, res: Response) {
     const result = await VoteInput.safeParseAsync(req.body.data)
 
     if (!result.success) {
-        res.status(400).send(result.error.message)
-        return
+        throw new BadRequest(result.error.message)
     }
 
     const data = result.data
@@ -156,32 +149,27 @@ export async function createVote(req: Request, res: Response) {
     const proposal = await getDoc<IProposal>('proposal', data.proposalId)
 
     if (proposal == null) {
-        res.status(404).send('Invalid proposalId')
-        return
+        throw new NotFoundError('Proposal not found')
     }
 
     if (!proposal.choices.some((choice) => choice.choiceId === data.choiceId && choice.title === data.choiceTitle)) {
-        res.status(400).send('Invalid choiceId')
-        return
+        throw new BadRequest('Invalid choiceId')
     }
 
     const voting = await getDoc<IVoting>('voting', data.proposalId)
 
     if (votedAt < voting.startTime) {
-        res.status(400).send('Voting is not started')
-        return
+        throw new BadRequest('Voting is not started')
     }
 
     if (votedAt > voting.endTime) {
-        res.status(400).send('Voting is ended')
-        return
+        throw new BadRequest('Voting is ended')
     }
 
     const existingVote = await getDoc<IVote>('vote', `${data.proposalId}.${data.walletAddress}`)
 
     if (existingVote != null) {
-        res.status(400).send('Your already voted')
-        return
+        throw new BadRequest('Your already voted')
     }
 
     const signatureVerifed = verifySignature({
@@ -198,8 +186,7 @@ export async function createVote(req: Request, res: Response) {
     })
 
     if (!signatureVerifed) {
-        res.status(400).send('Invalid signature')
-        return
+        throw new BadRequest('Invalid signature')
     }
 
     const vote: IVote = {
@@ -209,8 +196,7 @@ export async function createVote(req: Request, res: Response) {
     }
 
     if (vote.veReapAmount === 0) {
-        res.status(400).send("You don't have VeReap to vote")
-        return
+        throw new BadRequest("You don't have VeReap to vote")
     }
 
     const ref = db.collection('voting').doc(data.proposalId)

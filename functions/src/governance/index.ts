@@ -2,35 +2,31 @@ import { onRequest } from 'firebase-functions/v2/https'
 
 import * as logger from 'firebase-functions/logger'
 import { createProposal, createVote, createVoting, getVotes, getVotings } from './functions'
+import { BadRequest } from '../error'
+import { errorCaptured } from '../utils'
 
 export const governance = onRequest(
     {
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         timeoutSeconds: 180,
     },
-    async (req, res) => {
-        if (req.method === 'OPTIONS') {
-            res.status(200).end()
-            return
-        }
-
+    errorCaptured(async (req, res) => {
         logger.info(`Action: ${req.body.action}`, { data: req.body.data })
         switch (req.body.action) {
             case 'createProposal':
-                createProposal(req, res)
+                await createProposal(req, res)
                 break
-            // admin only
             case 'createVoting':
-                createVoting(req, res)
+                // admin only
+                await createVoting(req, res)
                 break
             case 'createVote':
-                createVote(req, res)
+                await createVote(req, res)
                 break
-
             default:
-                res.status(400).send('Unexpected action').end()
+                throw new BadRequest('Unexpected action')
         }
-    },
+    }),
 )
 
 export const votings = onRequest(
@@ -38,13 +34,9 @@ export const votings = onRequest(
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         timeoutSeconds: 180,
     },
-    async (req, res) => {
-        if (req.method === 'OPTIONS') {
-            res.status(200).end()
-            return
-        }
-        getVotings(req, res)
-    },
+    errorCaptured(async (req, res) => {
+        await getVotings(req, res)
+    }),
 )
 
 export const votes = onRequest(
@@ -52,11 +44,7 @@ export const votes = onRequest(
         cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         timeoutSeconds: 180,
     },
-    async (req, res) => {
-        if (req.method === 'OPTIONS') {
-            res.status(200).end()
-            return
-        }
-        getVotes(req, res)
-    },
+    errorCaptured(async (req, res) => {
+        await getVotes(req, res)
+    }),
 )
