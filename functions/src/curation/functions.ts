@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { BadRequest, CustomError } from '../error'
+import { AuthError, BadRequest } from '../error'
 import { getDoc } from '../firestore'
 import { getVeReapAmount } from '../governance/utils'
 import { IProfile, RequestContext } from '../types'
@@ -23,7 +23,7 @@ export async function createCurationList(data: { body: ICreateCurationListInput;
     const { profiles, publicKey } = data.ctx
     const payload = data.body
     if (!profiles.includes(payload.profile)) {
-        throw new CustomError("Access denied, you don't own this profile", 401)
+        throw new AuthError("Access denied, you don't own this profile")
     }
 
     const veReap = await getVeReapAmount('sui', publicKey)
@@ -36,7 +36,7 @@ export async function createCurationList(data: { body: ICreateCurationListInput;
     const profile = await getDoc<IProfile>('users', payload.profile)
 
     if ((profile?.curationList?.length ?? 0) >= maxAllowdCount) {
-        throw new BadRequest('Need to stake more REAP to create curation list')
+        throw new BadRequest('Need to stake more REAP to create more curation list')
     }
 
     if (profile?.curationList?.some((it) => it.name === payload.name)) {
@@ -63,7 +63,7 @@ export async function renameCurationList(data: {
 }) {
     const { profiles } = data.ctx
     if (!profiles.includes(data.body.profile)) {
-        throw new CustomError("Access denied, you don't own this profile", 401)
+        throw new AuthError("Access denied, you don't own this profile")
     }
 
     const profile = await getDoc<IProfile>('users', data.body.profile)
@@ -90,7 +90,7 @@ export async function removeCurationList(data: {
 }) {
     const { profiles } = data.ctx
     if (!profiles.includes(data.body.profile)) {
-        throw new CustomError("Access denied, you don't own this profile", 401)
+        throw new AuthError("Access denied, you don't own this profile")
     }
 
     const profile = await getDoc<IProfile>('users', data.body.profile)
@@ -108,7 +108,7 @@ export async function addProfileToCurationList(data: {
 }) {
     const { profiles } = data.ctx
     if (!profiles.includes(data.body.profile)) {
-        throw new CustomError("Access denied, you don't own this profile", 401)
+        throw new AuthError("Access denied, you don't own this profile")
     }
 
     const profile = await getDoc<IProfile>('users', data.body.profile)
@@ -135,7 +135,7 @@ export async function removeProfileFromCurationList(data: {
 }) {
     const { profiles } = data.ctx
     if (!profiles.includes(data.body.profile)) {
-        throw new CustomError("Access denied, you don't own this profile", 401)
+        throw new AuthError("Access denied, you don't own this profile")
     }
 
     const profile = await getDoc<IProfile>('users', data.body.profile)
