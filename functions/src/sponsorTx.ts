@@ -6,19 +6,34 @@ import { Response } from 'express'
 // The Firebase Admin SDK to access the Firebase Realtime Database.
 import admin from 'firebase-admin'
 
-import { RequestContext, TaskRequest, TaskResponse } from './types'
+import {
+    CreateComment,
+    CreatePost,
+    CreateProfile,
+    FollowProfile,
+    LikePost,
+    RequestContext,
+    TaskRequest,
+    TaskResponse,
+    UnfollowProfile,
+    UnlikePost,
+    UpdateProfileCover,
+    UpdateProfileDescription,
+    UpdateProfileImage,
+} from './types'
 import { RPC, findProfileOwnerCapFromChain, obj2Arr, sleep } from './utils'
 import { checkAddressOwnsProfileName } from './ethereum'
 import { JsonRpcProvider, Connection } from '@mysten/sui.js'
 import { findProfileOwnerCap, setProfileOwnerCap } from './firestore'
 import * as logger from 'firebase-functions/logger'
 import { AuthError, ServerError } from './error'
+import { z } from 'zod'
 
 globalThis.fetch = fetch as any
 
-export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+export const createProfile = async (ctx: RequestContext, data: z.infer<typeof CreateProfile>['data']) => {
     const { isEth, publicKey } = ctx
-    const { profileName } = req.body.data
+    const { profileName } = data
 
     const task: TaskRequest = {
         data: {
@@ -63,7 +78,7 @@ export const createProfile = async (ctx: RequestContext, req: Request, res: Resp
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
 
-    res.status(201).json(result)
+    return result
 }
 
 export const updateProfile = async (ctx: RequestContext, req: Request, _res: Response) => {
@@ -76,9 +91,9 @@ export const updateProfile = async (ctx: RequestContext, req: Request, _res: Res
     throw new ServerError('WIP')
 }
 
-export const createPost = async (ctx: RequestContext, req: Request, res: Response) => {
+export const createPost = async (ctx: RequestContext, data: z.infer<typeof CreatePost>['data']) => {
     const { profiles } = ctx
-    const { profile, imageUrl, content } = req.body.data
+    const { profile, imageUrl, content } = data
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
     }
@@ -86,12 +101,12 @@ export const createPost = async (ctx: RequestContext, req: Request, res: Respons
     const task: TaskRequest = {
         data: {
             action: 'createPost',
-            payload: { profile, imageUrl, content },
+            payload: { profile, imageUrl: imageUrl ?? '', content: content ?? '' },
         },
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
 export const adminCreatePost = async (profile: string, imageUrl: string, content: string) => {
@@ -106,9 +121,9 @@ export const adminCreatePost = async (profile: string, imageUrl: string, content
     return result
 }
 
-export const createComment = async (ctx: RequestContext, req: Request, res: Response) => {
+export const createComment = async (ctx: RequestContext, data: z.infer<typeof CreateComment>['data']) => {
     const { profiles } = ctx
-    const { post, profile, content } = req.body.data
+    const { post, profile, content } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -122,12 +137,13 @@ export const createComment = async (ctx: RequestContext, req: Request, res: Resp
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+
+    return result
 }
 
-export const likePost = async (ctx: RequestContext, req: Request, res: Response) => {
+export const likePost = async (ctx: RequestContext, data: z.infer<typeof LikePost>['data']) => {
     const { profiles } = ctx
-    const { profile, post } = req.body.data
+    const { profile, post } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -141,12 +157,12 @@ export const likePost = async (ctx: RequestContext, req: Request, res: Response)
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
-export const unlikePost = async (ctx: RequestContext, req: Request, res: Response) => {
+export const unlikePost = async (ctx: RequestContext, data: z.infer<typeof UnlikePost>['data']) => {
     const { profiles } = ctx
-    const { profile, post } = req.body.data
+    const { profile, post } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -160,12 +176,12 @@ export const unlikePost = async (ctx: RequestContext, req: Request, res: Respons
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
-export const followProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+export const followProfile = async (ctx: RequestContext, data: z.infer<typeof FollowProfile>['data']) => {
     const { profiles } = ctx
-    const { followingProfile, profile } = req.body.data
+    const { followingProfile, profile } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -178,12 +194,12 @@ export const followProfile = async (ctx: RequestContext, req: Request, res: Resp
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
-export const unfollowProfile = async (ctx: RequestContext, req: Request, res: Response) => {
+export const unfollowProfile = async (ctx: RequestContext, data: z.infer<typeof UnfollowProfile>['data']) => {
     const { profiles } = ctx
-    const { followingProfile, profile } = req.body.data
+    const { followingProfile, profile } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -197,12 +213,12 @@ export const unfollowProfile = async (ctx: RequestContext, req: Request, res: Re
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
-export const updateProfileImage = async (ctx: RequestContext, req: Request, res: Response) => {
+export const updateProfileImage = async (ctx: RequestContext, data: z.infer<typeof UpdateProfileImage>['data']) => {
     const { profiles, provider, adminPublicKey } = ctx
-    const { imageUrl, profile } = req.body.data
+    const { imageUrl, profile } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -222,12 +238,12 @@ export const updateProfileImage = async (ctx: RequestContext, req: Request, res:
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
-export const updateProfileCover = async (ctx: RequestContext, req: Request, res: Response) => {
+export const updateProfileCover = async (ctx: RequestContext, data: z.infer<typeof UpdateProfileCover>['data']) => {
     const { profiles, provider, adminPublicKey } = ctx
-    const { coverUrl, profile } = req.body.data
+    const { coverUrl, profile } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -246,12 +262,15 @@ export const updateProfileCover = async (ctx: RequestContext, req: Request, res:
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
-export const updateProfileDescription = async (ctx: RequestContext, req: Request, res: Response) => {
+export const updateProfileDescription = async (
+    ctx: RequestContext,
+    data: z.infer<typeof UpdateProfileDescription>['data'],
+) => {
     const { profiles, provider, adminPublicKey } = ctx
-    const { description, profile } = req.body.data
+    const { description, profile } = data
 
     if (!profiles.includes(profile)) {
         throw new AuthError("You don't own this profile")
@@ -271,7 +290,7 @@ export const updateProfileDescription = async (ctx: RequestContext, req: Request
     }
     const { key } = await admin.database().ref('/tasks').push(task)
     const result = await waitTask(key as string)
-    res.status(201).json(result)
+    return result
 }
 
 export async function waitTask(taskId: string) {

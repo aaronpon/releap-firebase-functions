@@ -146,64 +146,75 @@ export function errorCaptured(handler: (req: Request, res: Response) => Promise<
     }
 }
 
-export function parseRequestBody<T extends ZodTypeAny>(
-    parser: T,
-    handler: (req: Request, payload: z.infer<T>) => Promise<Something>,
+type Parsed<T extends ZodTypeAny | undefined> = T extends ZodTypeAny ? z.infer<T> : undefined
+type CTX<T extends true | 'optional' | undefined> = T extends true
+    ? RequestContext
+    : T extends 'optional'
+    ? RequestContext | undefined
+    : undefined
+
+async function parseOrThrow<T extends ZodTypeAny | undefined = undefined>(
+    parser: T | undefined,
+    data: any,
+): Promise<Parsed<T>> {
+    if (parser != null) {
+        const parsed = await parser.safeParseAsync(data)
+        if (!parsed.success) {
+            throw new BadRequest(parsed.error.message)
+        }
+        return parsed.data
+    } else {
+        return undefined as Parsed<T>
+    }
+}
+
+export function requestParser<
+    B extends ZodTypeAny | undefined = undefined,
+    Q extends ZodTypeAny | undefined = undefined,
+    P extends ZodTypeAny | undefined = undefined,
+    C extends true | 'optional' | undefined = undefined,
+>(
+    parser: { body?: B; query?: Q; params?: P; requireAuth?: C },
+    handler: (payload: {
+        req: Request
+        body: Parsed<B>
+        query: Parsed<Q>
+        params: Parsed<P>
+        ctx: CTX<C>
+    }) => Promise<Something>,
 ) {
     return async (req: Request, res: Response) => {
         try {
-            const parsed = await parser.safeParseAsync(req.body)
+            const [body, query, params] = await Promise.all([
+                parseOrThrow(parser.body, req.body),
+                parseOrThrow(parser.query, req.query),
+                parseOrThrow(parser.params, req.params),
+            ])
 
-            if (!parsed.success) {
-                throw new BadRequest(parsed.error.message)
+            let ctx
+            if (parser.requireAuth != null) {
+                try {
+                    ctx = getRequestContext(req)
+                } catch (err) {
+                    if (parser.requireAuth !== 'optional') {
+                        throw err
+                    }
+                }
             }
 
-            const result = await handler(req, parsed.data)
-            res.status(200).json(result)
+            const result = await handler({ req, body, query, params, ctx: ctx as CTX<C> })
+            const statusCode = req.method === 'POST' ? 201 : 200
+
+            res.status(statusCode).json(result)
         } catch (err) {
             errorHandler(err, res)
         }
     }
 }
 
-export function parseRequestQuery<T extends ZodTypeAny>(
-    parser: T,
-    handler: (req: Request, payload: z.infer<T>) => Promise<Something>,
-) {
-    return async (req: Request, res: Response) => {
-        try {
-            const parsed = await parser.safeParseAsync(req.query)
-
-            if (!parsed.success) {
-                throw new BadRequest(parsed.error.message)
-            }
-
-            const result = await handler(req, parsed.data)
-            res.status(200).json(result)
-        } catch (err) {
-            errorHandler(err, res)
-        }
-    }
-}
-
-export function parseRequestBodyWithCtx<T extends ZodTypeAny>(
-    parser: T,
-    handler: (ctx: RequestContext, payload: z.infer<T>) => Promise<Something>,
-) {
-    return async (req: Request, res: Response) => {
-        try {
-            const parsed = await parser.safeParseAsync(req.body)
-
-            if (!parsed.success) {
-                throw new BadRequest(parsed.error.message)
-            }
-
-            const ctx = getRequestContext(req)
-
-            const result = await handler(ctx, parsed.data)
-            res.status(200).json(result)
-        } catch (err) {
-            errorHandler(err, res)
-        }
+export function extractCtx<T>(req: Request, handler: (ctx: RequestContext, payload: T) => Promise<Something>) {
+    return async (req: Request, payload: T) => {
+        const ctx = getRequestContext(req)
+        return await handler(ctx, payload)
     }
 }

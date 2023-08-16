@@ -9,6 +9,10 @@ import {
     LoginChallengeToken,
     LoginChallengeTokenEth,
     RequestContext,
+    RequestEthLoginChallenge,
+    RequestLoginChallenge,
+    SubmitEthLoginChallenge,
+    SubmitLoginChallenge,
     TaskRequest,
     TokenPayload,
 } from './types'
@@ -19,10 +23,11 @@ import { isProfileEVMOnly, storeDoc } from './firestore'
 import admin from 'firebase-admin'
 import { getVeReapAmount } from './governance/utils'
 import { BadRequest, ServerError, errorHandler } from './error'
+import { z } from 'zod'
 
 const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
 
-export function getRequestContext(req: Request) {
+export function getRequestContext(req: Request): RequestContext {
     const jwt = req.headers['authorization']
     if (jwt == null) {
         throw new BadRequest('Missing authorization header')
@@ -42,9 +47,9 @@ export function getRequestContext(req: Request) {
     } catch (err) {
         throw new BadRequest('Invalid JWT')
     }
-    let ctx: RequestContext
+
     try {
-        ctx = {
+        return {
             publicKey,
             profiles,
             isEth,
@@ -59,8 +64,6 @@ export function getRequestContext(req: Request) {
     } catch (err) {
         throw new ServerError('Fail to create AppContext')
     }
-
-    return ctx
 }
 
 export function applyJwtValidation(handler: (ctx: RequestContext, req: Request, res: Response) => Promise<void>) {
@@ -84,8 +87,8 @@ export function verfiyJwt(jwt: string, secret: string) {
     }) as TokenPayload
 }
 
-export const requestLoginChallenge = (req: Request, res: Response) => {
-    const publicKey: string = req.body.data.publicKey
+export function requestLoginChallenge(data: z.infer<typeof RequestLoginChallenge>['data']) {
+    const publicKey: string = data.publicKey
     if (publicKey == null) {
         throw new BadRequest('Missing publicKey')
     }
@@ -101,15 +104,15 @@ export const requestLoginChallenge = (req: Request, res: Response) => {
         expiresIn: '120s',
     })
 
-    res.status(200).json({
+    return {
         jwt,
         signData,
-    })
+    }
 }
 
-export const submitLoginChallenge = async (req: Request, res: Response) => {
+export async function submitLoginChallenge(req: Request, data: z.infer<typeof SubmitLoginChallenge>['data']) {
     const reqJwt = req.headers['authorization']
-    const signature = req.body.data.signature
+    const signature = data.signature
 
     if (reqJwt == null) {
         throw new BadRequest('Missing authorization header')
@@ -145,29 +148,12 @@ export const submitLoginChallenge = async (req: Request, res: Response) => {
 
     const jwt = await genJWT(publicKey, { isEth: false })
 
-    res.status(200).json({ jwt, publicKey })
+    return { jwt, publicKey }
 }
 
-export const extendToken = async (req: Request, res: Response) => {
-    const reqJwt = req.headers['authorization']
-
-    if (reqJwt == null) {
-        throw new BadRequest('Missing authorization header')
-    }
-
-    const token = reqJwt.replace(/^Bearer /, '')
-
-    const { publicKey, isEth } = jsonwebtoken.verify(token, process.env.JWT_SECRET as string, {
-        ignoreExpiration: false,
-    }) as TokenPayload
-
-    if (publicKey == null) {
-        throw new BadRequest('Invalid signature')
-    }
-
-    const jwt = await genJWT(publicKey, { isEth: isEth ?? false })
-
-    res.status(200).json({ jwt, publicKey })
+export const extendToken = async (ctx: RequestContext) => {
+    const jwt = await genJWT(ctx.publicKey, { isEth: ctx.isEth ?? false })
+    return { jwt, publicKey: ctx.publicKey }
 }
 
 async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<string> {
@@ -267,8 +253,8 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
     })
 }
 
-export const requestEthLoginChallenge = (req: Request, res: Response) => {
-    const publicKey: string = req.body.data.publicKey
+export function requestEthLoginChallenge(data: z.infer<typeof RequestEthLoginChallenge>['data']) {
+    const publicKey: string = data.publicKey
     if (publicKey == null) {
         throw new BadRequest('Missing publicKey')
     }
@@ -284,16 +270,16 @@ export const requestEthLoginChallenge = (req: Request, res: Response) => {
         expiresIn: '120s',
     })
 
-    res.status(200).json({
+    return {
         jwt,
         statement,
         nonce,
-    })
+    }
 }
 
-export const submitEthLoginChallenge = async (req: Request, res: Response) => {
+export const submitEthLoginChallenge = async (req: Request, data: z.infer<typeof SubmitEthLoginChallenge>['data']) => {
     const reqJwt = req.headers['authorization']
-    const { signature, uri, domain, version, chainId, issuedAt } = req.body.data
+    const { signature, uri, domain, version, chainId, issuedAt } = data
 
     if (reqJwt == null) {
         throw new BadRequest('Missing authorization header')
@@ -329,5 +315,5 @@ export const submitEthLoginChallenge = async (req: Request, res: Response) => {
 
     const jwt = await genJWT(publicKey, { isEth: true })
 
-    res.status(200).json({ jwt, publicKey })
+    return { jwt, publicKey }
 }

@@ -7,12 +7,14 @@ import {
     removeProfileFromCurationList,
     renameCurationList,
 } from './functions'
-import { commonOnRequestSettings, parseRequestBodyWithCtx } from '../utils'
+import { commonOnRequestSettings, requestParser } from '../utils'
+//import express from 'express'
 
 export const curation = onRequest(
     commonOnRequestSettings,
-    parseRequestBodyWithCtx(CurationRequest, async (ctx, payload) => {
-        const { action, data } = payload
+    requestParser({ body: CurationRequest, requireAuth: true }, async (payload) => {
+        const { action, data } = payload.body
+        const ctx = payload.ctx
         switch (action) {
             case 'createList':
                 return await createCurationList(ctx, data)
@@ -27,3 +29,13 @@ export const curation = onRequest(
         }
     }),
 )
+
+/*
+const app = express()
+
+app.post('/', () => {})
+app.put('/:id', () => {})
+app.delete('/:id', () => {})
+app.post('/id/profile/:profileToFollow', () => {})
+app.delete('/:id/profile/:profileToRemove', () => {})
+*/

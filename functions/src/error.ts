@@ -38,7 +38,7 @@ export class ServerError extends CustomError {
 
 export function errorHandler(error: unknown, res: Response) {
     if (error instanceof CustomError) {
-        res.status(error.status).json({ message: error.message })
+        res.status(error.status).json({ error: error.message })
     } else {
         res.status(500).json({ message: 'internal server error' })
     }

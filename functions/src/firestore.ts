@@ -1,15 +1,36 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import admin from 'firebase-admin'
 import { randomUUID } from 'crypto'
-import { Request } from 'firebase-functions/v2/https'
-import { Response } from 'express'
 
-import { RequestContext, IQuestSubmission, IProfile, ICampaign, IEvent, IPost, IComment, IBadge, IPoint } from './types'
-import { QuestSubmissionInput, ApproveQuestInput, CreateCampaginInput } from './inputType'
+import {
+    RequestContext,
+    IQuestSubmission,
+    IProfile,
+    ICampaign,
+    IEvent,
+    IPost,
+    IComment,
+    IBadge,
+    IPoint,
+    FireStoreCreateProfile,
+    FireStoreCreatePost,
+    FireStoreCreateComment,
+    FireStoreFollowProfile,
+    FireStoreLikeComment,
+    FireStoreLikePost,
+    FireStoreMintBadge,
+    FireStoreCreateBadgeMint,
+    FireStoreUpdateLastActivity,
+    BadgeMintEligibility,
+    SubmitQuest,
+    UpdateQuestSubmission,
+} from './types'
 
-import { DocumentData, Timestamp, WhereFilterOp } from 'firebase-admin/firestore'
+import { CollectionReference, DocumentData, Query, Timestamp, WhereFilterOp } from 'firebase-admin/firestore'
 import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
 import { assignRole } from './discord'
 import { AuthError, BadRequest, NotFoundError, ServerError } from './error'
+import { z } from 'zod'
 
 export const db = admin.firestore()
 db.settings({ ignoreUndefinedProperties: true })
@@ -39,13 +60,17 @@ export async function getDocs<T>(
         limit = 0,
     }: {
         filters?: { path: keyof T; value: any; ops: WhereFilterOp }[]
-        orderBy: keyof T
-        descending: boolean
-        skip: number
-        limit: number
+        orderBy?: keyof T
+        descending?: boolean
+        skip?: number
+        limit?: number
     },
 ): Promise<T[]> {
-    let ref = db.collection(collection).orderBy(orderBy as string, descending ? 'desc' : 'asc')
+    let ref: Query<DocumentData> | CollectionReference<DocumentData> = db.collection(collection)
+
+    if (orderBy != null) {
+        ref = ref.orderBy(orderBy as string, descending ? 'desc' : 'asc')
+    }
 
     filters.forEach((filter) => {
         ref = ref.where(filter.path as string, filter.ops, filter.value)
@@ -94,20 +119,20 @@ export async function addCampaignPoint(campaignProfile: string, minter: string, 
     )
 }
 
-export const updateUserTwitterData = async (
+export async function updateUserTwitterData(
     profileAddress: string,
     twitterId: string | null,
     twitterHandle: string | null,
-) => {
+) {
     const ref = db.collection('users').doc(profileAddress)
     return await ref.update({ twitterId, twitterHandle })
 }
 
-export const updateUserDiscordData = async (
+export async function updateUserDiscordData(
     profileAddress: string,
     discordId: string | null,
     discordHandle: string | null,
-) => {
+) {
     const existingUser = await db.collection('users').where('discordId', '==', discordId).limit(1).get()
     if (existingUser.docs.length > 0) {
         await existingUser.docs[0].ref.update({ discordId: null, discordHandle: null })
@@ -117,28 +142,29 @@ export const updateUserDiscordData = async (
     return await ref.update({ discordId, discordHandle })
 }
 
-export const isProfileEVMOnly = async (profileName: string): Promise<boolean> => {
-    const ref = db.collection('users').where('name', '==', profileName).limit(1)
-    const docuRef = (await ref.get()).docs[0]
-    if (docuRef) {
-        const firestoreUser: any = docuRef.data()
+export async function isProfileEVMOnly(profileName: string): Promise<boolean> {
+    const [profile] = await getDocs<IProfile>('users', {
+        filters: [{ path: 'name', ops: '==', value: profileName }],
+        limit: 1,
+    })
+    if (profile) {
         console.log('Checking if user is EVM: ', profileName)
-        return firestoreUser?.isEVM ?? false
+        return profile?.isEVM ?? false
     } else {
         throw new Error('No profile found in firebase')
     }
 }
 
-export const createProfile = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { name, profileId, isEVM, chainId } = req.body.data
+export async function createProfile(ctx: RequestContext, data: z.infer<typeof FireStoreCreateProfile>['data']) {
+    const { name, profileId, isEVM, chainId } = data
 
     await storeDoc<IProfile>('users', profileId, { name, profileId, isEVM, chainId, activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const createPost = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { postId, profileId } = req.body.data
+export async function createPost(ctx: RequestContext, data: z.infer<typeof FireStoreCreatePost>['data']) {
+    const { postId, profileId } = data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
@@ -148,11 +174,11 @@ export const createPost = async (ctx: RequestContext, req: Request, res: Respons
     await storeDoc<IPost>('posts', postId, { postId, profileId, timeStamp })
     await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const createComment = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { postId, parentId, profileId, parentProfileId } = req.body.data
+export async function createComment(ctx: RequestContext, data: z.infer<typeof FireStoreCreateComment>['data']) {
+    const { postId, parentId, profileId, parentProfileId } = data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
@@ -170,11 +196,11 @@ export const createComment = async (ctx: RequestContext, req: Request, res: Resp
     })
     await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const followProfile = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { followeeId, followerId } = req.body.data
+export async function followProfile(ctx: RequestContext, data: z.infer<typeof FireStoreFollowProfile>['data']) {
+    const { followeeId, followerId } = data
     const { profiles } = ctx
     if (!profiles.includes(followerId)) {
         throw new AuthError("You don't own this profile")
@@ -191,11 +217,11 @@ export const followProfile = async (ctx: RequestContext, req: Request, res: Resp
     })
     await storeDoc<IProfile>('users', followerId, { activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const likePost = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { profileId, postId, postAuthorId } = req.body.data
+export async function likePost(ctx: RequestContext, data: z.infer<typeof FireStoreLikePost>['data']) {
+    const { profileId, postId, postAuthorId } = data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
@@ -211,11 +237,11 @@ export const likePost = async (ctx: RequestContext, req: Request, res: Response)
     })
     await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const likeComment = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { profileId, postId, commentId, postAuthorId } = req.body.data
+export async function likeComment(ctx: RequestContext, data: z.infer<typeof FireStoreLikeComment>['data']) {
+    const { profileId, postId, commentId, postAuthorId } = data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
@@ -232,11 +258,14 @@ export const likeComment = async (ctx: RequestContext, req: Request, res: Respon
     })
     await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const updateLastActivity = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { profileId } = req.body.data
+export async function updateLastActivity(
+    ctx: RequestContext,
+    data: z.infer<typeof FireStoreUpdateLastActivity>['data'],
+) {
+    const { profileId } = data
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
@@ -245,11 +274,11 @@ export const updateLastActivity = async (ctx: RequestContext, req: Request, res:
     await db.collection('users').doc(profileId).update({ lastActivity: Timestamp.now() })
     await storeDoc<IProfile>('users', profileId, { activeWallet: ctx.publicKey })
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const mintBadge = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { createdBadgeId, badgeId, minter, minterProfile } = req.body.data
+export async function mintBadge(ctx: RequestContext, data: z.infer<typeof FireStoreMintBadge>['data']) {
+    const { createdBadgeId, badgeId, minter, minterProfile } = data
     const { profiles } = ctx
     //const { profiles, provider, publicKey } = ctx
     if (!profiles.includes(minterProfile)) {
@@ -324,15 +353,10 @@ export const mintBadge = async (ctx: RequestContext, req: Request, res: Response
         }
     }
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Response) => {
-    const result = await CreateCampaginInput.passthrough().safeParseAsync(req.body.data)
-
-    if (!result.success) {
-        throw new BadRequest(result.error.message)
-    }
+export async function createBadgeMint(ctx: RequestContext, data: z.infer<typeof FireStoreCreateBadgeMint>['data']) {
     const {
         badgeId,
         name,
@@ -348,7 +372,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
         type,
         manualQuests,
         discordReward,
-    } = result.data
+    } = data
 
     const { profiles } = ctx
 
@@ -363,7 +387,7 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
     }
 
     const timeStamp = Timestamp.now()
-    await storeDoc<ICampaign>('badgeId', badgeId, {
+    const campaign = {
         badgeId,
         name,
         description,
@@ -386,13 +410,14 @@ export const createBadgeMint = async (ctx: RequestContext, req: Request, res: Re
                 id: quest.id ?? randomUUID(),
             }
         }),
-    })
+    }
+    await storeDoc<ICampaign>('badgeId', badgeId, campaign)
 
-    res.status(201).end()
+    return campaign
 }
 
-export const badgeMintEligibility = async (ctx: RequestContext, req: Request, res: Response) => {
-    const { badgeId, profileId } = req.body.data
+export async function badgeMintEligibility(ctx: RequestContext, data: z.infer<typeof BadgeMintEligibility>['data']) {
+    const { badgeId, profileId } = data
     const { profiles, publicKey, provider } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
@@ -412,22 +437,16 @@ export const badgeMintEligibility = async (ctx: RequestContext, req: Request, re
 
     const eligible = checkQuestEligibility(manualQuestsCompleted, suiQuestCompleted, twitterQuestCompleted)
 
-    res.json({
+    return {
         eligible,
         twitterQuestCompleted,
         suiQuestCompleted,
         manualQuestsCompleted,
-    }).end()
+    }
 }
 
-export const submitQuest = async (ctx: RequestContext, req: Request, res: Response) => {
-    const parseResult = await QuestSubmissionInput.safeParseAsync(req.body.data)
-
-    if (!parseResult.success) {
-        throw new BadRequest(parseResult.error.message)
-    }
-
-    const { questId, data, badgeId, profileId } = parseResult.data
+export async function submitQuest(ctx: RequestContext, payload: z.infer<typeof SubmitQuest>['data']) {
+    const { questId, data, badgeId, profileId } = payload
     const { profiles, publicKey } = ctx
 
     if (!profiles.includes(profileId)) {
@@ -462,17 +481,14 @@ export const submitQuest = async (ctx: RequestContext, req: Request, res: Respon
 
     await storeDoc<IQuestSubmission>('questSubmission', randomUUID(), task)
 
-    res.status(201).end()
+    return { success: true }
 }
 
-export const updateQuestSubmission = async (ctx: RequestContext, req: Request, res: Response) => {
-    const parseResult = await ApproveQuestInput.safeParseAsync(req.body.data)
-
-    if (!parseResult.success) {
-        throw new BadRequest(parseResult.error.message)
-    }
-
-    const { submissionId, action } = req.body.data
+export const updateQuestSubmission = async (
+    ctx: RequestContext,
+    data: z.infer<typeof UpdateQuestSubmission>['data'],
+) => {
+    const { submissionId, action } = data
     const { profiles } = ctx
     const submission = await getDoc<IQuestSubmission>('questSubmission', submissionId)
 
@@ -495,5 +511,5 @@ export const updateQuestSubmission = async (ctx: RequestContext, req: Request, r
         updatedAt: Timestamp.now(),
     })
 
-    res.status(201).end()
+    return { success: true }
 }

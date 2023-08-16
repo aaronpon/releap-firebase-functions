@@ -1,20 +1,12 @@
-import { Request } from 'firebase-functions/v2/https'
-import { Response } from 'express'
-import { DiscordServer, RequestContext } from './types'
+import { DiscordServer, RequestContext, VerifyDiscordServer } from './types'
 import { REST } from 'discord.js'
 import { API } from '@discordjs/core'
-import { VerifyDiscordServerInput } from './inputType'
 import { getDoc, storeDoc } from './firestore'
 import { AuthError, BadRequest } from './error'
+import { z } from 'zod'
 
-export async function verifyDiscordServer(ctx: RequestContext, req: Request, res: Response) {
-    const parseResult = await VerifyDiscordServerInput.safeParseAsync(req.body.data)
-
-    if (!parseResult.success) {
-        throw new BadRequest(parseResult.error.message)
-    }
-
-    const { profileId, discordServerId, roleId } = parseResult.data
+export async function verifyDiscordServer(ctx: RequestContext, data: z.infer<typeof VerifyDiscordServer>['data']) {
+    const { profileId, discordServerId, roleId } = data
 
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
@@ -25,7 +17,7 @@ export async function verifyDiscordServer(ctx: RequestContext, req: Request, res
     const roleVerified = await verifyDiscordServerRole(discordServerId, roleId)
 
     if (serverVerified && roleVerified) {
-        res.status(200).json({ success: true }).end()
+        return { success: true }
     } else {
         throw new BadRequest('Fail to fetch discord server info')
     }
