@@ -1,5 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https'
-import { CurationRequest } from './types'
+import { AddProfileToCurationListInput, CreateCurationListInput, RemoveCurationListInput } from './types'
 import {
     addProfileToCurationList,
     createCurationList,
@@ -8,34 +8,44 @@ import {
     renameCurationList,
 } from './functions'
 import { commonOnRequestSettings, requestParser } from '../utils'
-//import express from 'express'
+import express from 'express'
+import { z } from 'zod'
 
-export const curation = onRequest(
-    commonOnRequestSettings,
-    requestParser({ body: CurationRequest, requireAuth: true }, async (payload) => {
-        const { action, data } = payload.body
-        const ctx = payload.ctx
-        switch (action) {
-            case 'createList':
-                return await createCurationList(ctx, data)
-            case 'renameList':
-                return await renameCurationList(ctx, data)
-            case 'removeList':
-                return await removeCurationList(ctx, data)
-            case 'addProfileToList':
-                return await addProfileToCurationList(ctx, data)
-            case 'removeProfileFromList':
-                return await removeProfileFromCurationList(ctx, data)
-        }
-    }),
-)
-
-/*
 const app = express()
 
-app.post('/', () => {})
-app.put('/:id', () => {})
-app.delete('/:id', () => {})
-app.post('/id/profile/:profileToFollow', () => {})
-app.delete('/:id/profile/:profileToRemove', () => {})
-*/
+app.post('/', requestParser({ body: CreateCurationListInput, requireAuth: true }, createCurationList))
+app.put(
+    '/:curationListId',
+    requestParser(
+        { body: CreateCurationListInput, params: z.object({ curationListId: z.string() }), requireAuth: true },
+        renameCurationList,
+    ),
+)
+app.delete(
+    '/:curationListId',
+    requestParser(
+        { body: RemoveCurationListInput, params: z.object({ curationListId: z.string() }), requireAuth: true },
+        removeCurationList,
+    ),
+)
+
+app.post(
+    '/:curationListId/profile',
+    requestParser(
+        { body: AddProfileToCurationListInput, params: z.object({ curationListId: z.string() }), requireAuth: true },
+        addProfileToCurationList,
+    ),
+)
+app.delete(
+    '/:curationListId/profile/:profileToRemove',
+    requestParser(
+        {
+            body: AddProfileToCurationListInput,
+            params: z.object({ curationListId: z.string(), profileToRemove: z.string() }),
+            requireAuth: true,
+        },
+        removeProfileFromCurationList,
+    ),
+)
+
+export const curation = onRequest(commonOnRequestSettings, app)

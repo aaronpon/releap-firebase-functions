@@ -1,6 +1,5 @@
 import { Connection, JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
-import { Response } from 'express'
-import { Request } from 'firebase-functions/v2/https'
+import { Response, Request } from 'express'
 import { BadRequest, errorHandler } from './error'
 import { ZodTypeAny, z } from 'zod'
 import { RequestContext } from './types'
@@ -183,7 +182,7 @@ export function requestParser<
         ctx: CTX<C>
     }) => Promise<Something>,
 ) {
-    return async (req: Request, res: Response) => {
+    return async (req: Request, res: Response): Promise<void> => {
         try {
             const [body, query, params] = await Promise.all([
                 parseOrThrow(parser.body, req.body),
