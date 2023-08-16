@@ -1,13 +1,23 @@
 import { Connection, JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
 import { Response } from 'express'
 import { Request } from 'firebase-functions/v2/https'
-import { errorHandler } from './error'
+import { BadRequest, errorHandler } from './error'
+import { ZodTypeAny, z } from 'zod'
+import { RequestContext } from './types'
+import { getRequestContext } from './auth'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
 
 export const GAS_COUNT = parseInt(process.env.GAS_COUNT ?? '20')
 export const GAS_AMOUNT = parseFloat(process.env.GAS_AMOUNT ?? '1')
+
+type Something = NonNullable<object>
+
+export const commonOnRequestSettings = {
+    cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
+    timeoutSeconds: 180,
+}
 
 export async function getAllOwnedObjects(provider: JsonRpcProvider, address: string) {
     const data: PaginatedObjectsResponse['data'] = []
@@ -132,6 +142,68 @@ export function errorCaptured(handler: (req: Request, res: Response) => Promise<
             await handler(req, res)
         } catch (error) {
             errorHandler(error, res)
+        }
+    }
+}
+
+export function parseRequestBody<T extends ZodTypeAny>(
+    parser: T,
+    handler: (req: Request, payload: z.infer<T>) => Promise<Something>,
+) {
+    return async (req: Request, res: Response) => {
+        try {
+            const parsed = await parser.safeParseAsync(req.body)
+
+            if (!parsed.success) {
+                throw new BadRequest(parsed.error.message)
+            }
+
+            const result = await handler(req, parsed.data)
+            res.status(200).json(result)
+        } catch (err) {
+            errorHandler(err, res)
+        }
+    }
+}
+
+export function parseRequestQuery<T extends ZodTypeAny>(
+    parser: T,
+    handler: (req: Request, payload: z.infer<T>) => Promise<Something>,
+) {
+    return async (req: Request, res: Response) => {
+        try {
+            const parsed = await parser.safeParseAsync(req.query)
+
+            if (!parsed.success) {
+                throw new BadRequest(parsed.error.message)
+            }
+
+            const result = await handler(req, parsed.data)
+            res.status(200).json(result)
+        } catch (err) {
+            errorHandler(err, res)
+        }
+    }
+}
+
+export function parseRequestBodyWithCtx<T extends ZodTypeAny>(
+    parser: T,
+    handler: (ctx: RequestContext, payload: z.infer<T>) => Promise<Something>,
+) {
+    return async (req: Request, res: Response) => {
+        try {
+            const parsed = await parser.safeParseAsync(req.body)
+
+            if (!parsed.success) {
+                throw new BadRequest(parsed.error.message)
+            }
+
+            const ctx = getRequestContext(req)
+
+            const result = await handler(ctx, parsed.data)
+            res.status(200).json(result)
+        } catch (err) {
+            errorHandler(err, res)
         }
     }
 }

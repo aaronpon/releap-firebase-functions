@@ -35,7 +35,7 @@ import * as oauth from './oauth'
 import * as discord from './discord'
 import { rebalanceGas } from './task'
 import { BadRequest, ForbiddenError } from './error'
-import { errorCaptured } from './utils'
+import { commonOnRequestSettings, errorCaptured } from './utils'
 
 export { taskCreated } from './task'
 export { governance, votes, votings } from './governance'
@@ -43,6 +43,7 @@ export { curation } from './curation'
 
 export const entrypoint = onRequest(
     {
+        ...commonOnRequestSettings,
         secrets: [
             'JWT_SECRET',
             'TWITTER_COMSUMER_SECRET',
@@ -51,9 +52,7 @@ export const entrypoint = onRequest(
             'DISCORD_CLIENT_SECRET',
             'DISCORD_BOT_TOKEN',
         ],
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         minInstances: 2,
-        timeoutSeconds: 180,
         memory: '1GiB',
     },
     errorCaptured(async (req, res) => {

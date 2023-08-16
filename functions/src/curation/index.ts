@@ -1,6 +1,5 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { CurationRequest } from './types'
-import { getRequestContext } from '../auth'
 import {
     addProfileToCurationList,
     createCurationList,
@@ -8,44 +7,23 @@ import {
     removeProfileFromCurationList,
     renameCurationList,
 } from './functions'
-import { BadRequest } from '../error'
-import { errorCaptured } from '../utils'
+import { commonOnRequestSettings, parseRequestBodyWithCtx } from '../utils'
 
 export const curation = onRequest(
-    {
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
-        timeoutSeconds: 180,
-    },
-    errorCaptured(async (req, res) => {
-        const parsed = await CurationRequest.safeParseAsync(req.body)
-
-        if (!parsed.success) {
-            throw new BadRequest(parsed.error.message)
-        }
-
-        const { action, data } = parsed.data
-
-        const ctx = getRequestContext(req)
-
-        let result
+    commonOnRequestSettings,
+    parseRequestBodyWithCtx(CurationRequest, async (ctx, payload) => {
+        const { action, data } = payload
         switch (action) {
             case 'createList':
-                result = await createCurationList(ctx, data)
-                break
+                return await createCurationList(ctx, data)
             case 'renameList':
-                result = await renameCurationList(ctx, data)
-                break
+                return await renameCurationList(ctx, data)
             case 'removeList':
-                result = await removeCurationList(ctx, data)
-                break
+                return await removeCurationList(ctx, data)
             case 'addProfileToList':
-                result = await addProfileToCurationList(ctx, data)
-                break
+                return await addProfileToCurationList(ctx, data)
             case 'removeProfileFromList':
-                result = await removeProfileFromCurationList(ctx, data)
-                break
+                return await removeProfileFromCurationList(ctx, data)
         }
-
-        res.status(200).json(result)
     }),
 )

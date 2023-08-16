@@ -18,15 +18,11 @@ import { getFirstProfileName } from './ethereum'
 import { isProfileEVMOnly, storeDoc } from './firestore'
 import admin from 'firebase-admin'
 import { getVeReapAmount } from './governance/utils'
-import { BadRequest, ForbiddenError, ServerError, errorHandler } from './error'
+import { BadRequest, ServerError, errorHandler } from './error'
 
 const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
 
 export function getRequestContext(req: Request) {
-    if (req.method !== 'POST') {
-        throw new ForbiddenError()
-    }
-
     const jwt = req.headers['authorization']
     if (jwt == null) {
         throw new BadRequest('Missing authorization header')

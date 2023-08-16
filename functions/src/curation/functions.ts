@@ -75,7 +75,7 @@ export async function renameCurationList(ctx: RequestContext, payload: IRenameCu
     })
 
     await storeDoc('users', payload.profile, profile)
-    return profile.curationList
+    return profile.curationList ?? []
 }
 
 export async function removeCurationList(ctx: RequestContext, payload: IRemoveCurationListInput['data']) {
@@ -89,7 +89,7 @@ export async function removeCurationList(ctx: RequestContext, payload: IRemoveCu
     profile.curationList = profile.curationList?.filter((it) => it.id !== payload.id)
 
     await storeDoc('users', payload.profile, profile)
-    return profile.curationList
+    return profile.curationList ?? []
 }
 
 export async function addProfileToCurationList(ctx: RequestContext, payload: IAddProfileToCurationListInput['data']) {
@@ -112,7 +112,7 @@ export async function addProfileToCurationList(ctx: RequestContext, payload: IAd
     })
 
     await storeDoc('users', payload.profile, profile)
-    return profile.curationList
+    return profile.curationList ?? []
 }
 
 export async function removeProfileFromCurationList(
@@ -138,5 +138,5 @@ export async function removeProfileFromCurationList(
     })
 
     await storeDoc('users', payload.profile, profile)
-    return profile.curationList
+    return profile.curationList ?? []
 }

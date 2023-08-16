@@ -2,49 +2,36 @@ import { onRequest } from 'firebase-functions/v2/https'
 
 import * as logger from 'firebase-functions/logger'
 import { createProposal, createVote, createVoting, getVotes, getVotings } from './functions'
-import { BadRequest } from '../error'
-import { errorCaptured } from '../utils'
+import { commonOnRequestSettings, parseRequestBody, parseRequestQuery } from '../utils'
+import { GovernanceRequest, VoteQuery, VotingQuery } from './types'
 
 export const governance = onRequest(
-    {
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
-        timeoutSeconds: 180,
-    },
-    errorCaptured(async (req, res) => {
+    commonOnRequestSettings,
+    parseRequestBody(GovernanceRequest, async (req, payload) => {
         logger.info(`Action: ${req.body.action}`, { data: req.body.data })
-        switch (req.body.action) {
+        const { action, data } = payload
+        switch (action) {
             case 'createProposal':
-                await createProposal(req, res)
-                break
+                return await createProposal(data)
             case 'createVoting':
                 // admin only
-                await createVoting(req, res)
-                break
+                return await createVoting(data)
             case 'createVote':
-                await createVote(req, res)
-                break
-            default:
-                throw new BadRequest('Unexpected action')
+                return await createVote(data)
         }
     }),
 )
 
 export const votings = onRequest(
-    {
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
-        timeoutSeconds: 180,
-    },
-    errorCaptured(async (req, res) => {
-        await getVotings(req, res)
+    commonOnRequestSettings,
+    parseRequestQuery(VotingQuery, async (req, query) => {
+        return await getVotings(query)
     }),
 )
 
 export const votes = onRequest(
-    {
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
-        timeoutSeconds: 180,
-    },
-    errorCaptured(async (req, res) => {
-        await getVotes(req, res)
+    commonOnRequestSettings,
+    parseRequestQuery(VoteQuery, async (req, query) => {
+        return await getVotes(query)
     }),
 )

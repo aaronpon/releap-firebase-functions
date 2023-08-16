@@ -1,24 +1,15 @@
-import { Request } from 'firebase-functions/v2/https'
-import { Response } from 'express'
 import { randomUUID } from 'crypto'
-import { IProposal, IVote, IVoting, IVotingInput, ProposalInput, VoteInput, VotingInput } from './types'
+import { IProposal, IProposalInput, IVote, IVoteInput, IVoting, IVotingInput, VoteQuery, VotingQuery } from './types'
 import { db, getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 import { AuthError, BadRequest, NotFoundError } from '../error'
+import { z } from 'zod'
 
 const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
     '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
 ]
 
-export async function createProposal(req: Request, res: Response) {
-    const result = await ProposalInput.safeParseAsync(req.body.data)
-
-    if (!result.success) {
-        throw new BadRequest(result.error.message)
-    }
-
-    const data = result.data
-
+export async function createProposal(data: IProposalInput) {
     const signatureVerifed = verifySignature({
         data: {
             title: data.title,
@@ -53,20 +44,10 @@ export async function createProposal(req: Request, res: Response) {
 
     await storeDoc<IProposal>('proposal', proposal.proposalId, proposal)
 
-    res.status(201).json(proposal)
+    return proposal
 }
 
-export async function createVoting(req: Request, res: Response) {
-    const result = await VotingInput.safeParseAsync(req.body.data)
-
-    if (!result.success) {
-        throw new BadRequest(result.error.message)
-    }
-
-    const votingInput: IVotingInput = {
-        ...result.data,
-    }
-
+export async function createVoting(votingInput: IVotingInput) {
     const signatureVerifed = verifySignature({
         data: {
             proposalId: votingInput.proposalId,
@@ -97,54 +78,10 @@ export async function createVoting(req: Request, res: Response) {
 
     await storeDoc<IVoting>('voting', votingInput.proposalId, voting)
 
-    res.status(201).json(voting)
+    return voting
 }
 
-export async function getVotings(req: Request, res: Response) {
-    const { id, skip, limit } = req.query
-    if (id && typeof id === 'string') {
-        const voting = await getDoc<IVoting>('voting', id)
-        res.json([voting])
-    } else {
-        const skipStr = typeof skip === 'string' ? skip : '0'
-        const limitStr = typeof limit === 'string' ? limit : '20'
-        const skip_ = parseInt(skipStr)
-        const limit_ = Math.min(20, parseInt(limitStr))
-        const votings = await getDocs<IVoting>('voting', {
-            orderBy: 'createdAt',
-            descending: true,
-            skip: skip_,
-            limit: limit_,
-        })
-        res.json(votings)
-    }
-}
-
-export async function getVotes(req: Request, res: Response) {
-    const { proposalId, skip, limit } = req.query
-    const skipStr = typeof skip === 'string' ? skip : '0'
-    const limitStr = typeof limit === 'string' ? limit : '20'
-    const skip_ = parseInt(skipStr)
-    const limit_ = Math.min(20, parseInt(limitStr))
-    const votes = await getDocs<IVote>('vote', {
-        filters: [{ path: 'proposalId', ops: '==', value: proposalId }],
-        orderBy: 'votedAt',
-        descending: true,
-        skip: skip_,
-        limit: limit_,
-    })
-    res.json(votes)
-}
-
-export async function createVote(req: Request, res: Response) {
-    const result = await VoteInput.safeParseAsync(req.body.data)
-
-    if (!result.success) {
-        throw new BadRequest(result.error.message)
-    }
-
-    const data = result.data
-
+export async function createVote(data: IVoteInput) {
     const votedAt = Date.now()
     const proposal = await getDoc<IProposal>('proposal', data.proposalId)
 
@@ -216,5 +153,33 @@ export async function createVote(req: Request, res: Response) {
         { maxAttempts: 100 },
     )
 
-    res.status(201).json(vote)
+    return vote
+}
+
+export async function getVotings(query: z.infer<typeof VotingQuery>) {
+    const { id, skip, limit } = query
+    if (id != null) {
+        const voting = await getDoc<IVoting>('voting', id)
+        return [voting]
+    } else {
+        const votings = await getDocs<IVoting>('voting', {
+            orderBy: 'createdAt',
+            descending: true,
+            skip,
+            limit,
+        })
+        return votings
+    }
+}
+
+export async function getVotes(query: z.infer<typeof VoteQuery>) {
+    const { proposalId, skip, limit } = query
+    const votes = await getDocs<IVote>('vote', {
+        filters: [{ path: 'proposalId', ops: '==', value: proposalId }],
+        orderBy: 'votedAt',
+        descending: true,
+        skip,
+        limit,
+    })
+    return votes
 }
