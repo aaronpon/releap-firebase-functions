@@ -157,19 +157,19 @@ export async function createVote(data: IVoteInput) {
 }
 
 export async function getVotings(query: z.infer<typeof VotingQuery>) {
-    const { id, skip, limit } = query
-    if (id != null) {
-        const voting = await getDoc<IVoting>('voting', id)
-        return [voting]
-    } else {
-        const votings = await getDocs<IVoting>('voting', {
-            orderBy: 'createdAt',
-            descending: true,
-            skip,
-            limit,
-        })
-        return votings
-    }
+    const { skip, limit } = query
+    const votings = await getDocs<IVoting>('voting', {
+        orderBy: 'createdAt',
+        descending: true,
+        skip,
+        limit,
+    })
+    return votings
+}
+
+export async function getVoting(id: string) {
+    const voting = await getDoc<IVoting>('voting', id)
+    return voting
 }
 
 export async function getVotes(query: z.infer<typeof VoteQuery>) {

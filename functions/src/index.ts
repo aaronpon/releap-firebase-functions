@@ -37,7 +37,7 @@ import { AuthError } from './error'
 import { commonOnRequestSettings, requestParser } from './utils'
 
 export { taskCreated } from './task'
-export { governance, votes, votings } from './governance'
+export { governance } from './governance'
 export { curation } from './curation'
 
 export const entrypoint = onRequest(

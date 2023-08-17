@@ -54,23 +54,7 @@ export const Vote = z.object({
 export const VoteInput = Vote.extend({ veReapAmount: z.undefined(), votedAt: z.undefined() })
 export const VotingInput = Voting.extend({ proposal: z.undefined(), proposalId: z.string() })
 
-export const GovernanceRequest = z.union([
-    z.object({
-        action: z.literal('createProposal'),
-        data: ProposalInput,
-    }),
-    z.object({
-        action: z.literal('createVoting'),
-        data: VotingInput,
-    }),
-    z.object({
-        action: z.literal('createVote'),
-        data: VoteInput,
-    }),
-])
-
 export const VotingQuery = z.object({
-    id: z.string().optional(),
     skip: z.number().gte(0).default(0),
     limit: z.number().lte(20).default(20),
 })
