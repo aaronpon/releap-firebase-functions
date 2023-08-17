@@ -1,4 +1,6 @@
 import { Response } from 'express'
+import * as logger from 'firebase-functions/logger'
+import { ZodError } from 'zod'
 
 export class CustomError extends Error {
     constructor(message: string, public status: number) {
@@ -24,6 +26,14 @@ export class BadRequest extends CustomError {
     }
 }
 
+export class ParseInputError extends CustomError {
+    details: any
+    constructor(error: ZodError) {
+        super(error.message, 400)
+        this.details = error.format()
+    }
+}
+
 export class ForbiddenError extends CustomError {
     constructor(message = 'Forbidden') {
         super(message, 403)
@@ -37,7 +47,10 @@ export class ServerError extends CustomError {
 }
 
 export function errorHandler(error: unknown, res: Response) {
-    if (error instanceof CustomError) {
+    logger.error(error)
+    if (error instanceof ParseInputError) {
+        res.status(error.status).json({ error: error.details, message: error.message })
+    } else if (error instanceof CustomError) {
         res.status(error.status).json({ error: error.message })
     } else {
         res.status(500).json({ message: 'internal server error' })

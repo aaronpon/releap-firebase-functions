@@ -1,6 +1,6 @@
 import { Connection, JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
 import { Response, Request } from 'express'
-import { BadRequest, errorHandler } from './error'
+import { ParseInputError, errorHandler } from './error'
 import { ZodTypeAny, z } from 'zod'
 import { RequestContext } from './types'
 import { getRequestContext } from './auth'
@@ -159,7 +159,7 @@ async function parseOrThrow<T extends ZodTypeAny | undefined = undefined>(
     if (parser != null) {
         const parsed = await parser.safeParseAsync(data)
         if (!parsed.success) {
-            throw new BadRequest(parsed.error.message)
+            throw new ParseInputError(parsed.error)
         }
         return parsed.data
     } else {
@@ -208,12 +208,5 @@ export function requestParser<
         } catch (err) {
             errorHandler(err, res)
         }
-    }
-}
-
-export function extractCtx<T>(req: Request, handler: (ctx: RequestContext, payload: T) => Promise<Something>) {
-    return async (req: Request, payload: T) => {
-        const ctx = getRequestContext(req)
-        return await handler(ctx, payload)
     }
 }

@@ -300,7 +300,7 @@ export const FireStoreCreateProfile = z.object({
         name: z.string(),
         profileId: z.string(),
         isEVM: z.boolean(),
-        chainId: z.string(),
+        chainId: z.string().optional(),
     }),
 })
 
