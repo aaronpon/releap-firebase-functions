@@ -1,31 +1,47 @@
 import { onRequest } from 'firebase-functions/v2/https'
 
-import { createProposal, createVote, createVoting, getVotes, getVoting, getVotings } from './functions'
+import {
+    GOVERNANCE_ADMIN,
+    createProposal,
+    createVote,
+    createVoting,
+    getVotes,
+    getVoting,
+    getVotings,
+    rejectProposal,
+} from './functions'
 import { commonOnRequestSettings, requestParser } from '../utils'
-import { VoteInput, VoteQuery, VotingInput, VotingQuery } from './types'
+import { CreateVoteRequest, VoteQuery, CreateVotingRequest, VotingQuery, RejectProposalRequest } from './types'
 import express from 'express'
-import { ProposalInput } from './types'
+import { CreateProposalRequest } from './types'
 import { z } from 'zod'
 
 const app = express()
 
 app.post(
     '/proposals',
-    requestParser({ body: ProposalInput }, async (data) => {
+    requestParser({ body: CreateProposalRequest }, async (data) => {
         return await createProposal(data.body)
     }),
 )
 
 app.post(
+    '/proposals/reject',
+    requestParser({ body: RejectProposalRequest }, async (data) => {
+        return await rejectProposal(data.body)
+    }),
+)
+
+app.post(
     '/votings',
-    requestParser({ body: VotingInput }, async (data) => {
+    requestParser({ body: CreateVotingRequest }, async (data) => {
         return await createVoting(data.body)
     }),
 )
 
 app.post(
     '/votes',
-    requestParser({ body: VoteInput }, async (data) => {
+    requestParser({ body: CreateVoteRequest }, async (data) => {
         return await createVote(data.body)
     }),
 )
@@ -48,6 +64,13 @@ app.get(
     '/votings/:votingId',
     requestParser({ params: z.object({ votingId: z.string() }) }, async (payload) => {
         return await getVoting(payload.params.votingId)
+    }),
+)
+
+app.get(
+    '/admin',
+    requestParser({}, async () => {
+        return GOVERNANCE_ADMIN
     }),
 )
 

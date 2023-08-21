@@ -1,15 +1,25 @@
 import { randomUUID } from 'crypto'
-import { IProposal, IProposalInput, IVote, IVoteInput, IVoting, IVotingInput, VoteQuery, VotingQuery } from './types'
+import {
+    IProposal,
+    ICreateProposalRequest,
+    IVote,
+    ICreateVoteRequest,
+    IVoting,
+    ICreateVotingRequest,
+    VoteQuery,
+    VotingQuery,
+    IRejectProposalRequest,
+} from './types'
 import { db, getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 import { AuthError, BadRequest, NotFoundError } from '../error'
 import { z } from 'zod'
 
-const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
+export const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
     '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
 ]
 
-export async function createProposal(data: IProposalInput) {
+export async function createProposal(data: ICreateProposalRequest) {
     const signatureVerifed = verifySignature({
         data: {
             title: data.title,
@@ -47,7 +57,36 @@ export async function createProposal(data: IProposalInput) {
     return proposal
 }
 
-export async function createVoting(votingInput: IVotingInput) {
+export async function rejectProposal(data: IRejectProposalRequest) {
+    const signatureVerifed = verifySignature({
+        data: {
+            proposalId: data.proposalId,
+            createdAt: data.createdAt,
+            creator: data.creator,
+        },
+        chainId: data.chainId,
+        wallet: data.creator,
+        signature: data.signature,
+    })
+
+    if (!signatureVerifed) {
+        throw new BadRequest('Invalid signature')
+    }
+
+    if (!GOVERNANCE_ADMIN.includes(data.creator)) {
+        throw new AuthError('Access denied')
+    }
+
+    const proposal = await getDoc<IProposal>('proposal', data.proposalId)
+
+    proposal.rejected = true
+
+    await storeDoc<IProposal>('proposal', data.proposalId, proposal)
+
+    return proposal
+}
+
+export async function createVoting(votingInput: ICreateVotingRequest) {
     const signatureVerifed = verifySignature({
         data: {
             proposalId: votingInput.proposalId,
@@ -81,7 +120,7 @@ export async function createVoting(votingInput: IVotingInput) {
     return voting
 }
 
-export async function createVote(data: IVoteInput) {
+export async function createVote(data: ICreateVoteRequest) {
     const votedAt = Date.now()
     const proposal = await getDoc<IProposal>('proposal', data.proposalId)
 

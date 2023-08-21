@@ -21,11 +21,20 @@ export const Proposal = z.object({
     creator: z.string(),
     chainId: z.string().or(z.number()),
     signature: z.string(),
+    rejected: z.boolean().optional().default(false),
 })
 
-export const ProposalInput = Proposal.extend({
+export const CreateProposalRequest = Proposal.extend({
     proposalId: z.string().optional(),
     choices: ChoiceInput.array(),
+})
+
+export const RejectProposalRequest = z.object({
+    proposalId: z.string(),
+    chainId: z.string().or(z.number()),
+    creator: z.string(),
+    createdAt: z.number(),
+    signature: z.string(),
 })
 
 export const Voting = z.object({
@@ -51,8 +60,8 @@ export const Vote = z.object({
     signature: z.string(),
 })
 
-export const VoteInput = Vote.extend({ veReapAmount: z.undefined(), votedAt: z.undefined() })
-export const VotingInput = Voting.extend({ proposal: z.undefined(), proposalId: z.string() })
+export const CreateVoteRequest = Vote.extend({ veReapAmount: z.undefined(), votedAt: z.undefined() })
+export const CreateVotingRequest = Voting.extend({ proposal: z.undefined(), proposalId: z.string() })
 
 export const VotingQuery = z.object({
     skip: z.number().gte(0).default(0),
@@ -65,9 +74,10 @@ export const VoteQuery = z.object({
     limit: z.number().lte(20).default(20),
 })
 
-export type IProposalInput = z.infer<typeof ProposalInput>
+export type ICreateProposalRequest = z.infer<typeof CreateProposalRequest>
+export type IRejectProposalRequest = z.infer<typeof RejectProposalRequest>
 export type IProposal = z.infer<typeof Proposal>
 export type IVoting = z.infer<typeof Voting>
-export type IVotingInput = z.infer<typeof VotingInput>
+export type ICreateVotingRequest = z.infer<typeof CreateVotingRequest>
 export type IVote = z.infer<typeof Vote>
-export type IVoteInput = z.infer<typeof VoteInput>
+export type ICreateVoteRequest = z.infer<typeof CreateVoteRequest>
