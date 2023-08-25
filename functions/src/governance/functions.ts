@@ -9,11 +9,13 @@ import {
     VoteQuery,
     VotingQuery,
     IRejectProposalRequest,
+    ProposalQuery,
 } from './types'
 import { db, getDoc, getDocs, storeDoc } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 import { AuthError, BadRequest, NotFoundError } from '../error'
 import { z } from 'zod'
+import { DocFilters } from '../types'
 
 export const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
     '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
@@ -50,6 +52,7 @@ export async function createProposal(data: ICreateProposalRequest) {
                 ...choice,
             }
         }),
+        status: 'unlisted',
     }
 
     await storeDoc<IProposal>('proposal', proposal.proposalId, proposal)
@@ -80,6 +83,7 @@ export async function rejectProposal(data: IRejectProposalRequest) {
     const proposal = await getDoc<IProposal>('proposal', data.proposalId)
 
     proposal.rejected = true
+    proposal.status = 'rejected'
 
     await storeDoc<IProposal>('proposal', data.proposalId, proposal)
 
@@ -110,11 +114,14 @@ export async function createVoting(votingInput: ICreateVotingRequest) {
         throw new NotFoundError('Proposal not found')
     }
 
+    proposal.status = 'listed'
+
     const voting: IVoting = {
         ...votingInput,
         proposal,
     }
 
+    await storeDoc<IProposal>('proposal', votingInput.proposalId, proposal)
     await storeDoc<IVoting>('voting', votingInput.proposalId, voting)
 
     return voting
@@ -193,6 +200,21 @@ export async function createVote(data: ICreateVoteRequest) {
     )
 
     return vote
+}
+
+export async function getProposals(query: z.infer<typeof ProposalQuery>) {
+    const { skip, limit, status } = query
+    const filters: DocFilters<IProposal> = status != null ? [{ path: 'status', ops: '==', value: status }] : undefined
+
+    const votings = await getDocs<IProposal>('proposal', {
+        orderBy: 'createdAt',
+        descending: true,
+        filters,
+        skip,
+        limit,
+    })
+
+    return votings
 }
 
 export async function getVotings(query: z.infer<typeof VotingQuery>) {

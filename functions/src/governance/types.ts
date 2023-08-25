@@ -12,6 +12,8 @@ export const ChoiceInput = Choice.extend({
     choiceId: z.string().optional(),
 })
 
+export const ProposalStatus = z.enum(['unlisted', 'rejected', 'listed']).default('unlisted')
+
 export const Proposal = z.object({
     proposalId: z.string(),
     title: z.string(),
@@ -22,11 +24,13 @@ export const Proposal = z.object({
     chainId: z.string().or(z.number()),
     signature: z.string(),
     rejected: z.boolean().optional().default(false),
+    status: ProposalStatus,
 })
 
 export const CreateProposalRequest = Proposal.extend({
     proposalId: z.string().optional(),
     choices: ChoiceInput.array(),
+    status: z.undefined(),
 })
 
 export const RejectProposalRequest = z.object({
@@ -62,6 +66,12 @@ export const Vote = z.object({
 
 export const CreateVoteRequest = Vote.extend({ veReapAmount: z.undefined(), votedAt: z.undefined() })
 export const CreateVotingRequest = Voting.extend({ proposal: z.undefined(), proposalId: z.string() })
+
+export const ProposalQuery = z.object({
+    status: ProposalStatus.optional(),
+    skip: z.number().gte(0).default(0),
+    limit: z.number().lte(20).default(20),
+})
 
 export const VotingQuery = z.object({
     skip: z.number().gte(0).default(0),

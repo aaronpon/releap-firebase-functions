@@ -1,5 +1,5 @@
 import { JsonRpcProvider, RawSigner, SuiTransactionBlockResponse } from '@mysten/sui.js'
-import { Timestamp } from 'firebase-admin/firestore'
+import { Timestamp, WhereFilterOp } from 'firebase-admin/firestore'
 import z from 'zod'
 import { ApproveQuestInput, CreateCampaginInput, QuestSubmissionInput, VerifyDiscordServerInput } from './inputType'
 import { CurationList } from './curation/types'
@@ -524,3 +524,5 @@ export interface IWallet {
     address: string
     veReap: number
 }
+
+export type DocFilters<T> = { path: keyof T; value: any; ops: WhereFilterOp }[] | undefined

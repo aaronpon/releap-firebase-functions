@@ -5,13 +5,21 @@ import {
     createProposal,
     createVote,
     createVoting,
+    getProposals,
     getVotes,
     getVoting,
     getVotings,
     rejectProposal,
 } from './functions'
 import { commonOnRequestSettings, requestParser } from '../utils'
-import { CreateVoteRequest, VoteQuery, CreateVotingRequest, VotingQuery, RejectProposalRequest } from './types'
+import {
+    CreateVoteRequest,
+    VoteQuery,
+    CreateVotingRequest,
+    VotingQuery,
+    RejectProposalRequest,
+    ProposalQuery,
+} from './types'
 import express from 'express'
 import { CreateProposalRequest } from './types'
 import { z } from 'zod'
@@ -37,6 +45,18 @@ app.post(
     requestParser({ body: CreateVotingRequest }, async (data) => {
         return await createVoting(data.body)
     }),
+)
+
+app.get(
+    '/proposals',
+    requestParser(
+        {
+            query: ProposalQuery,
+        },
+        async (data) => {
+            return await getProposals(data.query)
+        },
+    ),
 )
 
 app.post(

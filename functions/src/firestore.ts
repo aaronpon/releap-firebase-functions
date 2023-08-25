@@ -24,9 +24,10 @@ import {
     BadgeMintEligibility,
     SubmitQuest,
     UpdateQuestSubmission,
+    DocFilters,
 } from './types'
 
-import { CollectionReference, DocumentData, Query, Timestamp, WhereFilterOp } from 'firebase-admin/firestore'
+import { CollectionReference, DocumentData, Query, Timestamp } from 'firebase-admin/firestore'
 import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
 import { assignRole } from './discord'
 import { AuthError, BadRequest, NotFoundError, ServerError } from './error'
@@ -59,7 +60,7 @@ export async function getDocs<T>(
         skip = 0,
         limit = 0,
     }: {
-        filters?: { path: keyof T; value: any; ops: WhereFilterOp }[]
+        filters?: DocFilters<T>
         orderBy?: keyof T
         descending?: boolean
         skip?: number
