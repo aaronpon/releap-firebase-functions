@@ -1,5 +1,16 @@
 import * as z from 'zod'
 
+export const numericString = (schema: z.ZodTypeAny) =>
+    z.preprocess((a) => {
+        if (typeof a === 'string') {
+            return parseInt(a, 10)
+        } else if (typeof a === 'number') {
+            return a
+        } else {
+            return undefined
+        }
+    }, schema)
+
 export const Choice = z.object({
     title: z.string(),
     description: z.string(),
@@ -69,19 +80,19 @@ export const CreateVotingRequest = Voting.extend({ proposal: z.undefined(), prop
 
 export const ProposalQuery = z.object({
     status: ProposalStatus.optional(),
-    skip: z.number().gte(0).default(0),
-    limit: z.number().lte(20).default(20),
+    skip: numericString(z.number().gte(0).default(0)),
+    limit: numericString(z.number().lte(20).default(20)),
 })
 
 export const VotingQuery = z.object({
-    skip: z.number().gte(0).default(0),
-    limit: z.number().lte(20).default(20),
+    skip: numericString(z.number().gte(0).default(0)),
+    limit: numericString(z.number().lte(20).default(20)),
 })
 
 export const VoteQuery = z.object({
     proposalId: z.string(),
-    skip: z.number().gte(0).default(0),
-    limit: z.number().lte(20).default(20),
+    skip: numericString(z.number().gte(0).default(0)),
+    limit: numericString(z.number().lte(20).default(20)),
 })
 
 export type ICreateProposalRequest = z.infer<typeof CreateProposalRequest>
