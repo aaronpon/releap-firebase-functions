@@ -91,6 +91,7 @@ export const Profile = z.object({
     discordHandle: z.string().optional().nullable(),
     activeWallet: z.string().optional().nullable(),
     curationList: CurationList.optional().nullable(),
+    profileTokenType: z.string().optional().nullable(),
 })
 
 export type IProfile = z.infer<typeof Profile>

@@ -1,9 +1,19 @@
-import { Connection, JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
+import {
+    Connection,
+    Ed25519Keypair,
+    JsonRpcProvider,
+    PaginatedCoins,
+    PaginatedObjectsResponse,
+    RawSigner,
+    SUI_TYPE_ARG,
+    SuiTransactionBlockResponse,
+} from '@mysten/sui.js'
 import { Response, Request } from 'express'
 import { ParseInputError, errorHandler } from './error'
 import { ZodTypeAny, z } from 'zod'
 import { RequestContext } from './types'
 import { getRequestContext } from './auth'
+import { ServerError } from './error'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
@@ -152,6 +162,8 @@ type CTX<T extends true | 'optional' | undefined> = T extends true
     ? RequestContext | undefined
     : undefined
 
+type AdminSigner<S extends true | undefined> = S extends true ? RawSigner : undefined
+
 async function parseOrThrow<T extends ZodTypeAny | undefined = undefined>(
     parser: T | undefined,
     data: any,
@@ -172,14 +184,16 @@ export function requestParser<
     Q extends ZodTypeAny | undefined = undefined,
     P extends ZodTypeAny | undefined = undefined,
     C extends true | 'optional' | undefined = undefined,
+    S extends true | undefined = undefined,
 >(
-    parser: { body?: B; query?: Q; params?: P; requireAuth?: C },
+    parser: { body?: B; query?: Q; params?: P; requireAuth?: C; signer?: S },
     handler: (payload: {
         req: Request
         body: Parsed<B>
         query: Parsed<Q>
         params: Parsed<P>
         ctx: CTX<C>
+        signer: AdminSigner<S>
     }) => Promise<Something>,
 ) {
     return async (req: Request, res: Response): Promise<void> => {
@@ -191,6 +205,7 @@ export function requestParser<
             ])
 
             let ctx
+            let signer
             if (parser.requireAuth != null) {
                 try {
                     ctx = getRequestContext(req)
@@ -200,13 +215,37 @@ export function requestParser<
                     }
                 }
             }
+            if (parser.signer == true) {
+                if (ctx == null) {
+                    throw new ServerError('Cannot create signer without ctx')
+                }
+                const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
+                signer = new RawSigner(keypair, ctx.provider)
+            }
 
-            const result = await handler({ req, body, query, params, ctx: ctx as CTX<C> })
+            const result = await handler({
+                req,
+                body,
+                query,
+                params,
+                ctx: ctx as CTX<C>,
+                signer: signer as AdminSigner<S>,
+            })
             const statusCode = req.method === 'POST' ? 201 : 200
 
             res.status(statusCode).json(result)
         } catch (err) {
             errorHandler(err, res)
         }
+    }
+}
+
+export function getCreatedObjectByType(result: SuiTransactionBlockResponse, objectType: RegExp): string | undefined {
+    const object = result.objectChanges?.find((it) => it.type === 'created' && it.objectType.match(objectType))
+    // stupid typescript !
+    if (object?.type === 'created') {
+        return object.objectId
+    } else {
+        return undefined
     }
 }
