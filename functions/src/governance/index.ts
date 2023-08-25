@@ -6,6 +6,7 @@ import {
     createVote,
     createVoting,
     getProposals,
+    getTotalProposals,
     getVotes,
     getVoting,
     getVotings,
@@ -57,6 +58,15 @@ app.get(
             return await getProposals(data.query)
         },
     ),
+)
+
+app.get(
+    '/proposals/totals',
+    requestParser({}, async () => {
+        return {
+            totalProposals: await getTotalProposals(),
+        }
+    }),
 )
 
 app.post(

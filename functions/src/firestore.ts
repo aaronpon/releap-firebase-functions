@@ -51,6 +51,23 @@ export async function getDoc<T>(collection: string, docId: string): Promise<T> {
     return (await ref.get()).data() as T
 }
 
+export async function getCountFromServer<T>(
+    collection: string,
+    {
+        filters = [],
+    }: {
+        filters?: DocFilters<T>
+    },
+): Promise<number> {
+    let ref: Query<DocumentData> | CollectionReference<DocumentData> = db.collection(collection)
+
+    filters.forEach((filter) => {
+        ref = ref.where(filter.path as string, filter.ops, filter.value)
+    })
+
+    return (await ref.get()).size
+}
+
 export async function getDocs<T>(
     collection: string,
     {

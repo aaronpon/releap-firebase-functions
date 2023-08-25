@@ -11,7 +11,7 @@ import {
     IRejectProposalRequest,
     ProposalQuery,
 } from './types'
-import { db, getDoc, getDocs, storeDoc } from '../firestore'
+import { db, getDoc, getDocs, storeDoc, getCountFromServer } from '../firestore'
 import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 import { AuthError, BadRequest, NotFoundError } from '../error'
 import { z } from 'zod'
@@ -215,6 +215,12 @@ export async function getProposals(query: z.infer<typeof ProposalQuery>) {
     })
 
     return votings
+}
+
+export async function getTotalProposals() {
+    const totalProposals = await getCountFromServer<IProposal>('proposal', {})
+
+    return totalProposals
 }
 
 export async function getVotings(query: z.infer<typeof VotingQuery>) {
