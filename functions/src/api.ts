@@ -4,15 +4,11 @@ import { ApifyTwitterRes } from './types'
 // Initialize the ApifyClient with API token
 const apikeys = [
     { token: 'apify_api_hGr4XrNcBxsY5mLd2kluTCr8TW8GAA3NdFbI', client: 'inalienable_pony/twitter-scraper-task' },
-    {
-        token: 'apify_api_hGr4XrNcBxsY5mLd2kluTCr8TW8GAA3NdFbI',
-        client: 'inalienable_pony/twitter-profile-tweets-scraper-temp-fix',
-    },
     { token: 'apify_api_kkOyeZBCaxZIQL89Odagqmw55O98io0GOs00', client: 'guiltless_shrub/twitter-scraper' },
     { token: 'apify_api_yh34WQDa8rijet2UDwBmcuodjZ03EG3dA2QF', client: 'scrupulous_nut/twitter-scraper-task' },
 ]
 
-const activeAccount = 3
+const activeAccount = 0
 
 const client = new ApifyClient({
     token: apikeys[activeAccount].token,

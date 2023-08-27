@@ -167,7 +167,7 @@ export const entrypoint = onRequest(
 
 export const twitterPostingV2 = onSchedule(
     {
-        schedule: 'every 5 minutes',
+        schedule: 'every 8 minutes',
         timeoutSeconds: 180,
     },
     async () => {
@@ -178,44 +178,42 @@ export const twitterPostingV2 = onSchedule(
 
                 logger.info(`Scraping profiles: ${profile.twitter}, last update at ${lastUpdate}`)
 
-                const response: ApifyTwitterRes[] = await scrapeTweets(profile.twitter)
+                const index = Math.floor(Math.random() * 99)
+
+                const tweet: ApifyTwitterRes = (await scrapeTweets(profile.twitter))[index]
 
                 await updateLastScrape(profile.name, new Date().toISOString())
 
-                await Promise.all(
-                    response.map(async (tweet) => {
-                        if (new Date(tweet.created_at) > new Date(lastUpdate) && !tweet.full_text.includes('RT')) {
-                            logger.info(`Got Tweet: ${profile.twitter}, ${tweet.full_text}`)
+                if (!tweet.full_text.includes('RT') && tweet.full_text.split('@').length < 3) {
+                    logger.info(`Got Tweet: ${profile.twitter}, ${tweet.full_text}`)
 
-                            const mediaUrl =
-                                tweet.media.length > 0
-                                    ? tweet.media[0]?.video_url == null
-                                        ? tweet.media[0].media_url
-                                        : tweet.media[0].video_url.split('.mp4')[0] + '.mp4'
-                                    : ''
+                    const mediaUrl =
+                        tweet.media.length > 0
+                            ? tweet.media[0]?.video_url == null
+                                ? tweet.media[0].media_url
+                                : tweet.media[0].video_url.split('.mp4')[0] + '.mp4'
+                            : ''
 
-                            const res: any = await adminCreatePost(
-                                profile.profileId,
-                                mediaUrl,
-                                tweet.full_text.replace(/https:\/\/t\.co\S*/g, ''),
-                            )
+                    const res: any = await adminCreatePost(
+                        profile.profileId,
+                        mediaUrl,
+                        tweet.full_text.replace(/https:\/\/t\.co\S*/g, '').replace(/@/g, ''),
+                    )
 
-                            const createdPostId =
-                                res.effects?.created?.find((it: any) => {
-                                    if (typeof it.owner === 'object' && 'Shared' in it.owner) {
-                                        return it.owner.Shared.initial_shared_version === it.reference.version
-                                    }
-                                    return ''
-                                })?.reference?.objectId ?? ''
+                    const createdPostId =
+                        res.effects?.created?.find((it: any) => {
+                            if (typeof it.owner === 'object' && 'Shared' in it.owner) {
+                                return it.owner.Shared.initial_shared_version === it.reference.version
+                            }
+                            return ''
+                        })?.reference?.objectId ?? ''
 
-                            await admin.firestore().collection('posts').doc(createdPostId).create({
-                                postId: createdPostId,
-                                timeStamp: admin.firestore.FieldValue.serverTimestamp(),
-                                profileId: profile.profileId,
-                            })
-                        }
-                    }),
-                )
+                    await admin.firestore().collection('posts').doc(createdPostId).create({
+                        postId: createdPostId,
+                        timeStamp: admin.firestore.FieldValue.serverTimestamp(),
+                        profileId: profile.profileId,
+                    })
+                }
             }),
         )
     },
