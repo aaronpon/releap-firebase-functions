@@ -19,7 +19,7 @@ import { DocFilters } from '../types'
 import { ADMIN } from '../auth'
 
 export async function createProposal(data: ICreateProposalRequest) {
-    const signatureVerifed = verifySignature({
+    const signatureVerifed = await verifySignature({
         data: {
             title: data.title,
             description: data.description,
@@ -56,11 +56,10 @@ export async function createProposal(data: ICreateProposalRequest) {
 }
 
 export async function rejectProposal(data: IRejectProposalRequest, proposalId: string) {
-    const signatureVerifed = verifySignature({
+    const signatureVerifed = await verifySignature({
         data: {
             proposalId: proposalId,
             signAt: data.signInfo.signAt,
-            signer: data.signInfo.signer,
         },
         signInfo: data.signInfo,
     })
@@ -84,7 +83,7 @@ export async function rejectProposal(data: IRejectProposalRequest, proposalId: s
 }
 
 export async function createVoting(votingInput: ICreateVotingRequest) {
-    const signatureVerifed = verifySignature({
+    const signatureVerifed = await verifySignature({
         data: {
             proposalId: votingInput.proposalId,
             signAt: votingInput.signInfo.signAt,
@@ -127,17 +126,19 @@ export async function createVoting(votingInput: ICreateVotingRequest) {
 
 export async function createVote(data: ICreateVoteRequest) {
     const votedAt = Date.now()
-    const proposal = await getDoc<IProposal>('proposal', data.proposalId)
 
-    if (proposal == null) {
-        throw new NotFoundError('Proposal not found')
+    const voting = await getDoc<IVoting>('voting', data.votingId)
+    if (voting == null) {
+        throw new NotFoundError('Voting not found')
     }
 
-    if (!proposal.choices.some((choice) => choice.choiceId === data.choiceId && choice.title === data.choiceTitle)) {
+    if (
+        !voting.proposal.choices.some(
+            (choice) => choice.choiceId === data.choiceId && choice.title === data.choiceTitle,
+        )
+    ) {
         throw new BadRequest('Invalid choiceId')
     }
-
-    const voting = await getDoc<IVoting>('voting', data.proposalId)
 
     if (votedAt < voting.startTime) {
         throw new BadRequest('Voting is not started')
@@ -147,18 +148,18 @@ export async function createVote(data: ICreateVoteRequest) {
         throw new BadRequest('Voting is ended')
     }
 
-    const existingVote = await getDoc<IVote>('vote', `${data.proposalId}.${data.signInfo.signer}`)
+    const existingVote = await getDoc<IVote>('vote', `${data.votingId}.${data.signInfo.signer}`)
 
     if (existingVote != null) {
         throw new BadRequest('Your already voted')
     }
 
-    const signatureVerifed = verifySignature({
+    const signatureVerifed = await verifySignature({
         data: {
-            proposalId: data.proposalId,
+            proposalId: data.votingId,
             choiceId: data.choiceId,
             choiceTitle: data.choiceTitle,
-            signedAt: data.signInfo.signAt,
+            signAt: data.signInfo.signAt,
         },
         signInfo: data.signInfo,
     })
@@ -177,7 +178,7 @@ export async function createVote(data: ICreateVoteRequest) {
         throw new BadRequest("You don't have VeReap to vote")
     }
 
-    const ref = db.collection('voting').doc(data.proposalId)
+    const ref = db.collection('voting').doc(data.votingId)
 
     await db.runTransaction(
         async (tx) => {
@@ -189,7 +190,7 @@ export async function createVote(data: ICreateVoteRequest) {
                 }
             })
             tx.set(ref, voting)
-            tx.set(db.collection('vote').doc(`${vote.proposalId}.${vote.signInfo.signer}`), vote)
+            tx.set(db.collection('vote').doc(`${vote.votingId}.${vote.signInfo.signer}`), vote)
         },
         { maxAttempts: 100 },
     )
@@ -235,9 +236,9 @@ export async function getVoting(id: string) {
 }
 
 export async function getVotes(query: z.infer<typeof VoteQuery>) {
-    const { proposalId, skip, limit } = query
+    const { votingId, skip, limit } = query
     const votes = await getDocs<IVote>('vote', {
-        filters: [{ path: 'proposalId', ops: '==', value: proposalId }],
+        filters: [{ path: 'votingId', ops: '==', value: votingId }],
         orderBy: 'votedAt',
         descending: true,
         skip,

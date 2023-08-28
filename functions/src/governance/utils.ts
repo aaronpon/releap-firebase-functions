@@ -6,11 +6,11 @@ import { SignInfo } from './types'
 const MIN_VEREAP_CREATE_PROPOSAL = parseInt(process.env.MIN_VEREAP_CREATE_PROPOSAL ?? '500000')
 const REAP_STAKING_POOL_ADDRESS = process.env.REAP_STAKING_POOL_ADDRESS
 
-export async function verifySignature({
+export async function verifySignature<T extends { signAt: number }>({
     data,
     signInfo,
 }: {
-    data: any
+    data: T
     signInfo: z.infer<typeof SignInfo>
 }): Promise<boolean> {
     if (signInfo.chainId === 'sui') {
@@ -19,7 +19,7 @@ export async function verifySignature({
         if (pubKey.toSuiAddress() !== signInfo.signer) {
             return false
         }
-        return verifyMessage(data, signInfo.signature, IntentScope.PersonalMessage)
+        return await verifyMessage(JSON.stringify(data), signInfo.signature, IntentScope.PersonalMessage)
     } else {
         throw new Error(`Not supported chainId ${signInfo.chainId}`)
     }
@@ -40,6 +40,7 @@ export async function getVeReapLock(wallet: string): Promise<VeReapLockInfo | nu
         id: REAP_STAKING_POOL_ADDRESS as string,
         options: { showContent: true },
     })
+
     const bag = pool.data?.content?.dataType === 'moveObject' && pool.data?.content?.fields?.stakers?.fields?.id?.id
 
     try {

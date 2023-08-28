@@ -66,7 +66,7 @@ export const Voting = z.object({
 })
 
 export const Vote = z.object({
-    proposalId: z.string(),
+    votingId: z.string(),
     votedAt: z.number(),
     choiceId: z.string(),
     choiceTitle: z.string(),
@@ -98,7 +98,7 @@ export const VotingQuery = z.object({
 })
 
 export const VoteQuery = z.object({
-    proposalId: z.string(),
+    votingId: z.string(),
     skip: numericString(z.number().gte(0).default(0)),
     limit: numericString(z.number().lte(20).default(20)),
 })
