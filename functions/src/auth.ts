@@ -39,6 +39,7 @@ export function getRequestContext(req: Request): RequestContext {
     let publicKey
     let profiles
     let isEth = false
+    console.log(process.env.JWT_SECRET)
     try {
         const tokenPayload: TokenPayload = verfiyJwt(jwt, process.env.JWT_SECRET as string)
         if (tokenPayload.publicKey == null) {

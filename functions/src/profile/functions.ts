@@ -62,22 +62,21 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
             },
         })
 
-        const coinStructName = profile.name.replace(/\s/g, '_').toUpperCase()
+        const coinStruct = result.objectChanges?.find((it) => it.type === 'published')
 
         const treasuryCap = getCreatedObjectByType(result, /TreasuryCap/)
+        const coinStructName = profile.name.replace(/\s/g, '_').toUpperCase()
 
-        const coinStruct = result.objectChanges?.find(
-            (it) => it.type === 'created' && it.objectType.endsWith(coinStructName),
-        )
+        const _package = coinStruct?.type === 'published' && coinStruct.packageId
+        const [_module] = (coinStruct?.type === 'published' && coinStruct.modules) as string[]
 
-        const coinType = coinStruct?.type === 'created' && coinStruct.objectType
-        const [_package, _module, _] = (coinType as string).split('::')
+        const coinType = `${_package}::${_module}::${coinStructName}`
 
         const deployPoolTx = new TransactionBlock()
 
-        deployTokenTx.setGasPayment([gas])
+        deployPoolTx.setGasPayment([gas])
 
-        const mintedProfileToken = deployPoolTx.moveCall({
+        const [mintedProfileToken] = deployPoolTx.moveCall({
             target: `${_package}::${_module}::mint_only`,
             arguments: [deployPoolTx.object(treasuryCap as string), deployPoolTx.pure(PROFILE_TOKEN_AMOUNT)],
             typeArguments: [],
@@ -95,16 +94,16 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
             deployPoolTx.mergeCoins(target, rest)
         }
 
-        const splitedReap = deployPoolTx.splitCoins(target, [deployPoolTx.pure(REAP_TOKEN_AMOUNT)])
+        const [splitedReap] = deployPoolTx.splitCoins(target, [deployPoolTx.pure(REAP_TOKEN_AMOUNT)])
 
         deployPoolTx.moveCall({
-            target: `0x0::interface::create_v_pool`,
-            typeArguments: [coinType as string, process.env.REAP_TYPE as string],
+            target: `${process.env.AMM_ADDRESS}::interface::create_v_pool`,
+            typeArguments: [coinType, process.env.REAP_TYPE as string],
             arguments: [
                 deployPoolTx.object(process.env.POOL_STORAGE as string),
                 deployPoolTx.object(SUI_CLOCK_OBJECT_ID),
-                mintedProfileToken,
-                splitedReap,
+                deployPoolTx.makeMoveVec({ objects: [mintedProfileToken] }),
+                deployPoolTx.makeMoveVec({ objects: [splitedReap] }),
                 deployPoolTx.pure(PROFILE_TOKEN_AMOUNT),
                 deployPoolTx.pure(REAP_TOKEN_AMOUNT),
             ],
