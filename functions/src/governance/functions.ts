@@ -24,19 +24,16 @@ export async function createProposal(data: ICreateProposalRequest) {
             title: data.title,
             description: data.description,
             choices: data.choices,
-            createdAt: data.createdAt,
-            creator: data.creator,
+            signAt: data.signInfo.signAt,
         },
-        chainId: data.chainId,
-        wallet: data.creator,
-        signature: data.signature,
+        signInfo: data.signInfo,
     })
 
     if (!signatureVerifed) {
         throw new BadRequest('Invalid signature')
     }
 
-    if (!(await checkVeReapThreshold(data.chainId, data.creator))) {
+    if (!(await checkVeReapThreshold(data.signInfo.chainId, data.signInfo.signer))) {
         throw new BadRequest("You don't have enough veReap")
     }
 
@@ -50,6 +47,7 @@ export async function createProposal(data: ICreateProposalRequest) {
             }
         }),
         status: 'unlisted',
+        createdAt: Date.now(),
     }
 
     await storeDoc<IProposal>('proposal', proposal.proposalId, proposal)
@@ -57,32 +55,30 @@ export async function createProposal(data: ICreateProposalRequest) {
     return proposal
 }
 
-export async function rejectProposal(data: IRejectProposalRequest) {
+export async function rejectProposal(data: IRejectProposalRequest, proposalId: string) {
     const signatureVerifed = verifySignature({
         data: {
-            proposalId: data.proposalId,
-            createdAt: data.createdAt,
-            creator: data.creator,
+            proposalId: proposalId,
+            signAt: data.signInfo.signAt,
+            signer: data.signInfo.signer,
         },
-        chainId: data.chainId,
-        wallet: data.creator,
-        signature: data.signature,
+        signInfo: data.signInfo,
     })
 
     if (!signatureVerifed) {
         throw new BadRequest('Invalid signature')
     }
 
-    if (!ADMIN.includes(data.creator)) {
+    if (!ADMIN.includes(data.signInfo.signer)) {
         throw new AuthError('Access denied')
     }
 
-    const proposal = await getDoc<IProposal>('proposal', data.proposalId)
+    const proposal = await getDoc<IProposal>('proposal', proposalId)
 
     proposal.rejected = true
     proposal.status = 'rejected'
 
-    await storeDoc<IProposal>('proposal', data.proposalId, proposal)
+    await storeDoc<IProposal>('proposal', proposalId, proposal)
 
     return proposal
 }
@@ -91,17 +87,16 @@ export async function createVoting(votingInput: ICreateVotingRequest) {
     const signatureVerifed = verifySignature({
         data: {
             proposalId: votingInput.proposalId,
+            signAt: votingInput.signInfo.signAt,
         },
-        chainId: votingInput.chainId,
-        wallet: votingInput.creator,
-        signature: votingInput.signature,
+        signInfo: votingInput.signInfo,
     })
 
     if (!signatureVerifed) {
         throw new BadRequest('Invalid signature')
     }
 
-    if (!ADMIN.includes(votingInput.creator)) {
+    if (!ADMIN.includes(votingInput.signInfo.signer)) {
         throw new AuthError('Access denied')
     }
 
@@ -121,6 +116,7 @@ export async function createVoting(votingInput: ICreateVotingRequest) {
         ...votingInput,
         votingId: randomUUID(),
         proposal,
+        createdAt: Date.now(),
     }
 
     await storeDoc<IProposal>('proposal', votingInput.proposalId, proposal)
@@ -151,7 +147,7 @@ export async function createVote(data: ICreateVoteRequest) {
         throw new BadRequest('Voting is ended')
     }
 
-    const existingVote = await getDoc<IVote>('vote', `${data.proposalId}.${data.walletAddress}`)
+    const existingVote = await getDoc<IVote>('vote', `${data.proposalId}.${data.signInfo.signer}`)
 
     if (existingVote != null) {
         throw new BadRequest('Your already voted')
@@ -162,12 +158,9 @@ export async function createVote(data: ICreateVoteRequest) {
             proposalId: data.proposalId,
             choiceId: data.choiceId,
             choiceTitle: data.choiceTitle,
-            signedAt: data.signedAt,
-            walletAddress: data.walletAddress,
+            signedAt: data.signInfo.signAt,
         },
-        chainId: data.chainId,
-        wallet: data.walletAddress,
-        signature: data.signature,
+        signInfo: data.signInfo,
     })
 
     if (!signatureVerifed) {
@@ -177,7 +170,7 @@ export async function createVote(data: ICreateVoteRequest) {
     const vote: IVote = {
         ...data,
         votedAt,
-        veReapAmount: await getVeReapAmount(data.chainId, data.walletAddress),
+        veReapAmount: await getVeReapAmount(data.signInfo.chainId, data.signInfo.signer),
     }
 
     if (vote.veReapAmount === 0) {
@@ -196,7 +189,7 @@ export async function createVote(data: ICreateVoteRequest) {
                 }
             })
             tx.set(ref, voting)
-            tx.set(db.collection('vote').doc(`${vote.proposalId}.${vote.walletAddress}`), vote)
+            tx.set(db.collection('vote').doc(`${vote.proposalId}.${vote.signInfo.signer}`), vote)
         },
         { maxAttempts: 100 },
     )

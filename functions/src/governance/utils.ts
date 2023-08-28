@@ -1,29 +1,27 @@
 import { IntentScope, toSingleSignaturePubkeyPair, verifyMessage } from '@mysten/sui.js'
 import { getDynamicFieldByName, getProvider } from '../utils'
+import { z } from 'zod'
+import { SignInfo } from './types'
 
 const MIN_VEREAP_CREATE_PROPOSAL = parseInt(process.env.MIN_VEREAP_CREATE_PROPOSAL ?? '500000')
 const REAP_STAKING_POOL_ADDRESS = process.env.REAP_STAKING_POOL_ADDRESS
 
 export async function verifySignature({
     data,
-    chainId,
-    wallet,
-    signature,
+    signInfo,
 }: {
     data: any
-    chainId: string | number
-    wallet: string
-    signature: string
+    signInfo: z.infer<typeof SignInfo>
 }): Promise<boolean> {
-    if (chainId === 'sui') {
+    if (signInfo.chainId === 'sui') {
         return true
-        const { pubKey } = toSingleSignaturePubkeyPair(signature)
-        if (pubKey.toSuiAddress() !== wallet) {
+        const { pubKey } = toSingleSignaturePubkeyPair(signInfo.signature)
+        if (pubKey.toSuiAddress() !== signInfo.signer) {
             return false
         }
-        return verifyMessage(data, signature, IntentScope.PersonalMessage)
+        return verifyMessage(data, signInfo.signature, IntentScope.PersonalMessage)
     } else {
-        throw new Error(`Not supported chainId ${chainId}`)
+        throw new Error(`Not supported chainId ${signInfo.chainId}`)
     }
 }
 

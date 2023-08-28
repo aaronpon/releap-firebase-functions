@@ -34,10 +34,10 @@ app.post(
     }),
 )
 
-app.post(
-    '/proposals/reject',
-    requestParser({ body: RejectProposalRequest }, async (data) => {
-        return await rejectProposal(data.body)
+app.delete(
+    '/proposals/:proposalId',
+    requestParser({ body: RejectProposalRequest, params: z.object({ proposalId: z.string() }) }, async (data) => {
+        return await rejectProposal(data.body, data.params.proposalId)
     }),
 )
 
