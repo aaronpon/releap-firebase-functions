@@ -54,6 +54,7 @@ export const RejectProposalRequest = z.object({
 })
 
 export const Voting = z.object({
+    votingId: z.string(),
     proposal: Proposal,
     quorum: z.number(),
     startTime: z.number(),
@@ -77,7 +78,11 @@ export const Vote = z.object({
 })
 
 export const CreateVoteRequest = Vote.extend({ veReapAmount: z.undefined(), votedAt: z.undefined() })
-export const CreateVotingRequest = Voting.extend({ proposal: z.undefined(), proposalId: z.string() })
+export const CreateVotingRequest = Voting.extend({
+    proposal: z.undefined(),
+    votingId: z.undefined(),
+    proposalId: z.string(),
+})
 
 export const ProposalQuery = z.object({
     status: ProposalStatus.optional(),

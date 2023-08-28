@@ -111,15 +111,20 @@ export async function createVoting(votingInput: ICreateVotingRequest) {
         throw new NotFoundError('Proposal not found')
     }
 
+    if (proposal.status === 'listed') {
+        throw new BadRequest('Proposal incorrect status')
+    }
+
     proposal.status = 'listed'
 
     const voting: IVoting = {
         ...votingInput,
+        votingId: randomUUID(),
         proposal,
     }
 
     await storeDoc<IProposal>('proposal', votingInput.proposalId, proposal)
-    await storeDoc<IVoting>('voting', votingInput.proposalId, voting)
+    await storeDoc<IVoting>('voting', voting.votingId, voting)
 
     return voting
 }

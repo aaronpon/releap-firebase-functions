@@ -43,4 +43,7 @@ app.post(
     }),
 )
 
-export const profile = onRequest({ ...commonOnRequestSettings, secrets: ['SEED_PHRASE'] }, app)
+export const profile = onRequest(
+    { ...commonOnRequestSettings, secrets: [...commonOnRequestSettings.secrets, 'SEED_PHRASE'] },
+    app,
+)

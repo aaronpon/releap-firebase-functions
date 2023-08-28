@@ -25,6 +25,7 @@ type Something = NonNullable<object>
 
 export const commonOnRequestSettings = {
     cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
+    secrets: ['JWT_SECRET'],
     timeoutSeconds: 180,
 }
 
