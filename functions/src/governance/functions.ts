@@ -16,10 +16,7 @@ import { checkVeReapThreshold, getVeReapAmount, verifySignature } from './utils'
 import { AuthError, BadRequest, NotFoundError } from '../error'
 import { z } from 'zod'
 import { DocFilters } from '../types'
-
-export const GOVERNANCE_ADMIN = process.env.GOVERNANCE_ADMIN?.split(',') ?? [
-    '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
-]
+import { ADMIN } from '../auth'
 
 export async function createProposal(data: ICreateProposalRequest) {
     const signatureVerifed = verifySignature({
@@ -76,7 +73,7 @@ export async function rejectProposal(data: IRejectProposalRequest) {
         throw new BadRequest('Invalid signature')
     }
 
-    if (!GOVERNANCE_ADMIN.includes(data.creator)) {
+    if (!ADMIN.includes(data.creator)) {
         throw new AuthError('Access denied')
     }
 
@@ -104,7 +101,7 @@ export async function createVoting(votingInput: ICreateVotingRequest) {
         throw new BadRequest('Invalid signature')
     }
 
-    if (!GOVERNANCE_ADMIN.includes(votingInput.creator)) {
+    if (!ADMIN.includes(votingInput.creator)) {
         throw new AuthError('Access denied')
     }
 

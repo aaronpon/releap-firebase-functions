@@ -24,6 +24,10 @@ import { getVeReapAmount } from './governance/utils'
 import { BadRequest, ServerError, errorHandler } from './error'
 import { z } from 'zod'
 
+export const ADMIN = process.env.ADMIN?.split(',') ?? [
+    '0xf0da02c49b96f5ab2cf7529cdcb66161581b92b28c421c11692e097c26315151',
+]
+
 const signMessage = [`Sign in to Releap.`, `This action will authenticate your wallet and enable to access the Releap.`]
 
 export function getRequestContext(req: Request): RequestContext {
@@ -59,6 +63,7 @@ export function getRequestContext(req: Request): RequestContext {
             index: process.env.INDEX as string,
             profileTable: process.env.PROFILE_TABLE as string,
             provider: new JsonRpcProvider(new Connection({ fullnode: RPC })),
+            isAdmin: ADMIN.includes(publicKey),
         }
     } catch (err) {
         throw new ServerError('Fail to create AppContext')

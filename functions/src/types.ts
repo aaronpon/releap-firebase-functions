@@ -136,6 +136,7 @@ export interface AppContext {
     index: string
     profileTable: string
     adminCap: string
+    isAdmin: boolean
 }
 
 export type ShareContext = Omit<AppContext, 'publicKey' | 'profiles' | 'isEth' | 'role'>
