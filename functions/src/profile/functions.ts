@@ -1,4 +1,11 @@
-import { RawSigner, SUI_CLOCK_OBJECT_ID, TransactionBlock, fromB64, normalizeSuiObjectId } from '@mysten/sui.js'
+import {
+    JsonRpcProvider,
+    RawSigner,
+    SUI_CLOCK_OBJECT_ID,
+    TransactionBlock,
+    fromB64,
+    normalizeSuiObjectId,
+} from '@mysten/sui.js'
 import axios from 'axios'
 
 import { IProfile } from '../types'
@@ -55,9 +62,19 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
         typeArguments: [],
     })
 
-    const splitedReap = deployPoolTx.splitCoins(deployPoolTx.object(process.env.REAP_COIN as string), [
-        deployPoolTx.pure(REAP_TOKEN_AMOUNT),
-    ])
+    const reapToken = await getAllCoinsByType({
+        provider: signer.provider,
+        owner: signerAddress,
+        coinType: process.env.REAP_TYPE as string,
+    })
+
+    const [target, ...rest] = reapToken.map((it) => deployPoolTx.object(it.coinObjectId))
+
+    if (reapToken.length > 1) {
+        deployPoolTx.mergeCoins(target, rest)
+    }
+
+    const splitedReap = deployPoolTx.splitCoins(target, [deployPoolTx.pure(REAP_TOKEN_AMOUNT)])
 
     deployPoolTx.moveCall({
         target: `0x0::interface::create_v_pool`,
@@ -95,4 +112,33 @@ async function getCompiledToken(options: {
     return {
         ...res.data,
     }
+}
+
+export const getAllCoinsByType = async (options: {
+    provider: JsonRpcProvider
+    owner: string
+    coinType: string
+}): Promise<
+    {
+        version: string
+        digest: string
+        coinType: string
+        previousTransaction: string
+        coinObjectId: string
+        balance: string
+        lockedUntilEpoch?: number | null | undefined
+    }[]
+> => {
+    let cursor = null
+    let hasNextPage = true
+    const result = []
+
+    while (hasNextPage) {
+        const response = await options.provider.getCoins({ owner: options.owner, coinType: options.coinType, cursor })
+        cursor = response.nextCursor
+        hasNextPage = response.hasNextPage
+        result.push(...response.data)
+    }
+
+    return result
 }
