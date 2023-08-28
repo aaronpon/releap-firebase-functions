@@ -7,10 +7,12 @@ import {
     normalizeSuiObjectId,
 } from '@mysten/sui.js'
 import axios from 'axios'
+import * as logger from 'firebase-functions/logger'
 
 import { IProfile } from '../types'
-import { getCreatedObjectByType } from '../utils'
+import { getCreatedObjectByType, retry } from '../utils'
 import { CompiledToken } from './types'
+import { borrowGas, returnGas } from '../task'
 
 const PROFILE_TOKEN_AMOUNT = 300
 const REAP_TOKEN_AMOUNT = 30000 * 1_000_000_000
@@ -25,82 +27,106 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
         description: `Releap Profile Token: ${profile.name}`,
     })
 
-    const deployTokenTx = new TransactionBlock()
-
-    const [upgradeCap] = deployTokenTx.publish({
-        modules: modules.map((it) => Array.from(fromB64(it))),
-        dependencies: dependencies.map((it) => normalizeSuiObjectId(it)),
-    })
-
-    deployTokenTx.transferObjects([upgradeCap], deployTokenTx.pure(signerAddress))
-
-    const result = await signer.signAndExecuteTransactionBlock({
-        transactionBlock: deployTokenTx,
-        options: {
-            showEvents: true,
-            showEffects: true,
-            showObjectChanges: true,
+    const gas = await retry(
+        async () => {
+            const gas = await borrowGas()
+            if (gas == null) {
+                throw new Error('Server busy, no gas coin avaliable')
+            }
+            return gas
         },
-    })
-
-    const coinStructName = profile.name.replace(/\s/g, '_').toUpperCase()
-
-    const treasuryCap = getCreatedObjectByType(result, /TreasuryCap/)
-
-    const coinStruct = result.objectChanges?.find(
-        (it) => it.type === 'created' && it.objectType.endsWith(coinStructName),
+        {
+            retryCount: 50,
+            retryDelayMs: 500,
+        },
     )
 
-    const coinType = coinStruct?.type === 'created' && coinStruct.objectType
-    const [_package, _module, _] = coinType as string
+    try {
+        const deployTokenTx = new TransactionBlock()
 
-    const deployPoolTx = new TransactionBlock()
+        deployTokenTx.setGasPayment([gas])
 
-    const mintedProfileToken = deployPoolTx.moveCall({
-        target: `${_package}::${_module}::mint_only`,
-        arguments: [deployPoolTx.object(treasuryCap as string), deployPoolTx.pure(PROFILE_TOKEN_AMOUNT)],
-        typeArguments: [],
-    })
+        const [upgradeCap] = deployTokenTx.publish({
+            modules: modules.map((it) => Array.from(fromB64(it))),
+            dependencies: dependencies.map((it) => normalizeSuiObjectId(it)),
+        })
 
-    const reapToken = await getAllCoinsByType({
-        provider: signer.provider,
-        owner: signerAddress,
-        coinType: process.env.REAP_TYPE as string,
-    })
+        deployTokenTx.transferObjects([upgradeCap], deployTokenTx.pure(signerAddress))
 
-    const [target, ...rest] = reapToken.map((it) => deployPoolTx.object(it.coinObjectId))
+        const result = await signer.signAndExecuteTransactionBlock({
+            transactionBlock: deployTokenTx,
+            options: {
+                showEvents: true,
+                showEffects: true,
+                showObjectChanges: true,
+            },
+        })
 
-    if (reapToken.length > 1) {
-        deployPoolTx.mergeCoins(target, rest)
+        const coinStructName = profile.name.replace(/\s/g, '_').toUpperCase()
+
+        const treasuryCap = getCreatedObjectByType(result, /TreasuryCap/)
+
+        const coinStruct = result.objectChanges?.find(
+            (it) => it.type === 'created' && it.objectType.endsWith(coinStructName),
+        )
+
+        const coinType = coinStruct?.type === 'created' && coinStruct.objectType
+        const [_package, _module, _] = (coinType as string).split('::')
+
+        const deployPoolTx = new TransactionBlock()
+
+        deployTokenTx.setGasPayment([gas])
+
+        const mintedProfileToken = deployPoolTx.moveCall({
+            target: `${_package}::${_module}::mint_only`,
+            arguments: [deployPoolTx.object(treasuryCap as string), deployPoolTx.pure(PROFILE_TOKEN_AMOUNT)],
+            typeArguments: [],
+        })
+
+        const reapToken = await getAllCoinsByType({
+            provider: signer.provider,
+            owner: signerAddress,
+            coinType: process.env.REAP_TYPE as string,
+        })
+
+        const [target, ...rest] = reapToken.map((it) => deployPoolTx.object(it.coinObjectId))
+
+        if (reapToken.length > 1) {
+            deployPoolTx.mergeCoins(target, rest)
+        }
+
+        const splitedReap = deployPoolTx.splitCoins(target, [deployPoolTx.pure(REAP_TOKEN_AMOUNT)])
+
+        deployPoolTx.moveCall({
+            target: `0x0::interface::create_v_pool`,
+            typeArguments: [coinType as string, process.env.REAP_TYPE as string],
+            arguments: [
+                deployPoolTx.object(process.env.POOL_STORAGE as string),
+                deployPoolTx.object(SUI_CLOCK_OBJECT_ID),
+                mintedProfileToken,
+                splitedReap,
+                deployPoolTx.pure(PROFILE_TOKEN_AMOUNT),
+                deployPoolTx.pure(REAP_TOKEN_AMOUNT),
+            ],
+        })
+
+        await signer.signAndExecuteTransactionBlock({
+            transactionBlock: deployPoolTx,
+            options: {
+                showObjectChanges: true,
+                showEffects: true,
+                showEvents: true,
+            },
+        })
+
+        profile.profileTokenType = coinType as string
+
+        return profile
+    } catch (err) {
+        logger.error(err)
+        throw err
+        await returnGas(gas)
     }
-
-    const splitedReap = deployPoolTx.splitCoins(target, [deployPoolTx.pure(REAP_TOKEN_AMOUNT)])
-
-    deployPoolTx.moveCall({
-        target: `0x0::interface::create_v_pool`,
-        typeArguments: [coinType as string, process.env.REAP_TYPE as string],
-        arguments: [
-            deployPoolTx.object(process.env.POOL_STORAGE as string),
-            deployPoolTx.object(SUI_CLOCK_OBJECT_ID),
-            mintedProfileToken,
-            splitedReap,
-            deployPoolTx.pure(PROFILE_TOKEN_AMOUNT),
-            deployPoolTx.pure(REAP_TOKEN_AMOUNT),
-        ],
-    })
-
-    await signer.signAndExecuteTransactionBlock({
-        transactionBlock: deployPoolTx,
-        options: {
-            showObjectChanges: true,
-            showEffects: true,
-            showEvents: true,
-        },
-    })
-
-    profile.profileTokenType = coinType as string
-
-    return profile
 }
 
 async function getCompiledToken(options: {
