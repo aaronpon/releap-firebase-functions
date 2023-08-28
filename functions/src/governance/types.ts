@@ -99,6 +99,7 @@ export const VotingQuery = z.object({
 
 export const VoteQuery = z.object({
     votingId: z.string(),
+    voter: z.string().optional(),
     skip: numericString(z.number().gte(0).default(0)),
     limit: numericString(z.number().lte(20).default(20)),
 })

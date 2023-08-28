@@ -528,4 +528,20 @@ export interface IWallet {
     veReap: number
 }
 
-export type DocFilters<T> = { path: keyof T; value: any; ops: WhereFilterOp }[] | undefined
+type DeepKeyOf<T> = (
+    [T] extends [never]
+        ? ''
+        : T extends object
+        ? {
+              [K in Exclude<keyof T, symbol>]: `${K}${undefined extends T[K] ? '?' : ''}${DotPrefix<DeepKeyOf<T[K]>>}`
+          }[Exclude<keyof T, symbol>]
+        : ''
+) extends infer D
+    ? Extract<D, string>
+    : never
+
+type DotPrefix<T extends string> = T extends '' ? '' : `.${T}`
+
+type Path<T extends object> = DeepKeyOf<T>
+
+export type DocFilters<T extends object> = { path: Path<T>; value: any; ops: WhereFilterOp }[] | undefined

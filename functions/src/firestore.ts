@@ -51,7 +51,7 @@ export async function getDoc<T>(collection: string, docId: string): Promise<T> {
     return (await ref.get()).data() as T
 }
 
-export async function getCountFromServer<T>(
+export async function getCountFromServer<T extends object>(
     collection: string,
     {
         filters = [],
@@ -68,7 +68,7 @@ export async function getCountFromServer<T>(
     return (await ref.get()).size
 }
 
-export async function getDocs<T>(
+export async function getDocs<T extends object>(
     collection: string,
     {
         filters = [],

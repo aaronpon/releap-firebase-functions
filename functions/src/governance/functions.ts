@@ -236,9 +236,13 @@ export async function getVoting(id: string) {
 }
 
 export async function getVotes(query: z.infer<typeof VoteQuery>) {
-    const { votingId, skip, limit } = query
+    const { votingId, voter, skip, limit } = query
+    const filters: DocFilters<IVote> = [{ path: 'votingId', ops: '==', value: votingId }]
+    if (voter != null) {
+        filters.push({ path: 'signInfo.signer', ops: '==', value: voter })
+    }
     const votes = await getDocs<IVote>('vote', {
-        filters: [{ path: 'votingId', ops: '==', value: votingId }],
+        filters,
         orderBy: 'votedAt',
         descending: true,
         skip,
