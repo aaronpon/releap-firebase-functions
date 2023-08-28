@@ -1,7 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https'
 
 import {
-    GOVERNANCE_ADMIN,
     createProposal,
     createVote,
     createVoting,
@@ -24,6 +23,7 @@ import {
 import express from 'express'
 import { CreateProposalRequest } from './types'
 import { z } from 'zod'
+import { ADMIN } from '../auth'
 
 const app = express()
 
@@ -100,7 +100,7 @@ app.get(
 app.get(
     '/admin',
     requestParser({}, async () => {
-        return GOVERNANCE_ADMIN
+        return ADMIN
     }),
 )
 

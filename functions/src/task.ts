@@ -38,6 +38,7 @@ export const taskCreated = onValueCreated(
             adminPublicKey: process.env.ADMIN_PUBLICKEY as string,
             index: process.env.INDEX as string,
             profileTable: process.env.PROFILE_TABLE as string,
+            isAdmin: false,
         }
 
         try {

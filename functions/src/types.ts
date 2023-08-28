@@ -121,6 +121,7 @@ export interface TokenPayload {
     publicKey: string
     profiles: string[]
     isEth: boolean
+    isAdmin: boolean
 }
 
 export interface AppContext {

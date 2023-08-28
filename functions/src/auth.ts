@@ -250,6 +250,7 @@ async function genJWT(publicKey: string, options: { isEth: boolean }): Promise<s
         publicKey,
         profiles,
         isEth: options.isEth,
+        isAdmin: ADMIN.includes(publicKey),
     }
 
     return jsonwebtoken.sign(payload, process.env.JWT_SECRET as string, {
