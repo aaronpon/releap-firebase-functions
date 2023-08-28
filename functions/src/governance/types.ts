@@ -29,6 +29,7 @@ export const Proposal = z.object({
     proposalId: z.string(),
     title: z.string(),
     description: z.string(),
+    discussion: z.string().optional(),
     createdAt: z.number(),
     choices: Choice.array(),
     creator: z.string(),
