@@ -1,16 +1,11 @@
 import { randomUUID } from 'crypto'
 import { AuthError, BadRequest } from '../error'
-import { getDoc } from '../firestore'
+import { getDoc, getDocs } from '../firestore'
 import { getVeReapAmount } from '../governance/utils'
 import { IProfile, RequestContext } from '../types'
-import {
-    IAddProfileToCurationListInput,
-    ICreateCurationListInput,
-    IRemoveCurationListInput,
-    IRemoveProfileFromCurationListInput,
-    IRenameCurationListInput,
-} from './types'
+import { ICreateCurationListInput, IRemoveCurationListInput, IUpdateCurationListInput } from './types'
 import { storeDoc } from '../firestore'
+import { validateProfileNames } from '../utils'
 
 // temp value
 const veReapAndCurationListCount = [
@@ -20,7 +15,7 @@ const veReapAndCurationListCount = [
 ]
 
 export async function createCurationList(data: { body: ICreateCurationListInput; ctx: RequestContext }) {
-    const { profiles, publicKey } = data.ctx
+    const { profiles, publicKey, provider } = data.ctx
     const payload = data.body
     if (!profiles.includes(payload.profile)) {
         throw new AuthError("Access denied, you don't own this profile")
@@ -43,12 +38,24 @@ export async function createCurationList(data: { body: ICreateCurationListInput;
         throw new BadRequest('You already have a curation has the same name')
     }
 
+    const invalidProfiles = await validateProfileNames(provider, data.body.followedProfileNames)
+
+    if (invalidProfiles.length > 0) {
+        throw new BadRequest(`The following profile names are invalid: ${JSON.stringify(invalidProfiles)}`)
+    }
+
+    const profilesToFollow = await getDocs<IProfile>('users', {
+        filters: [{ path: 'name', ops: 'in', value: data.body.followedProfileNames }],
+    })
+
+    const followedProfiles: string[] = profilesToFollow.map((it) => it.profileId)
+
     profile.curationList = profile.curationList ?? []
 
     profile.curationList.push({
         id: randomUUID(),
         name: payload.name,
-        followedProfiles: [],
+        followedProfiles,
     })
 
     await storeDoc('users', payload.profile, profile)
@@ -56,8 +63,8 @@ export async function createCurationList(data: { body: ICreateCurationListInput;
     return profile.curationList
 }
 
-export async function renameCurationList(data: {
-    body: IRenameCurationListInput
+export async function updateCurationList(data: {
+    body: IUpdateCurationListInput
     ctx: RequestContext
     params: { curationListId: string }
 }) {
@@ -96,60 +103,6 @@ export async function removeCurationList(data: {
     const profile = await getDoc<IProfile>('users', data.body.profile)
 
     profile.curationList = profile.curationList?.filter((it) => it.id !== data.params.curationListId)
-
-    await storeDoc('users', data.body.profile, profile)
-    return profile.curationList ?? []
-}
-
-export async function addProfileToCurationList(data: {
-    body: IAddProfileToCurationListInput
-    ctx: RequestContext
-    params: { curationListId: string }
-}) {
-    const { profiles } = data.ctx
-    if (!profiles.includes(data.body.profile)) {
-        throw new AuthError("Access denied, you don't own this profile")
-    }
-
-    const profile = await getDoc<IProfile>('users', data.body.profile)
-
-    profile.curationList = profile.curationList?.map((it) => {
-        if (it.id === data.params.curationListId) {
-            return {
-                ...it,
-                followedProfiles: [...it.followedProfiles, data.body.profileToAdd],
-            }
-        } else {
-            return it
-        }
-    })
-
-    await storeDoc('users', data.body.profile, profile)
-    return profile.curationList ?? []
-}
-
-export async function removeProfileFromCurationList(data: {
-    body: IRemoveProfileFromCurationListInput
-    ctx: RequestContext
-    params: { curationListId: string; profileToRemove: string }
-}) {
-    const { profiles } = data.ctx
-    if (!profiles.includes(data.body.profile)) {
-        throw new AuthError("Access denied, you don't own this profile")
-    }
-
-    const profile = await getDoc<IProfile>('users', data.body.profile)
-
-    profile.curationList = profile.curationList?.map((it) => {
-        if (it.id === data.params.curationListId) {
-            return {
-                ...it,
-                followedProfiles: it.followedProfiles.filter((p) => p !== data.params.profileToRemove),
-            }
-        } else {
-            return it
-        }
-    })
 
     await storeDoc('users', data.body.profile, profile)
     return profile.curationList ?? []

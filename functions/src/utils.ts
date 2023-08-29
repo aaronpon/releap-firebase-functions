@@ -1,5 +1,6 @@
 import {
     Connection,
+    DynamicFieldPage,
     Ed25519Keypair,
     JsonRpcProvider,
     PaginatedCoins,
@@ -249,4 +250,28 @@ export function getCreatedObjectByType(result: SuiTransactionBlockResponse, obje
     } else {
         return undefined
     }
+}
+
+export async function getAllDynamicFields(provider: JsonRpcProvider, address: string) {
+    const data: DynamicFieldPage['data'] = []
+    let nextCursor = null
+    let hasNextPage = true
+
+    while (hasNextPage) {
+        const dynamicFieldResponse: DynamicFieldPage = await provider.getDynamicFields({
+            parentId: address,
+            cursor: nextCursor,
+        })
+        hasNextPage = dynamicFieldResponse.hasNextPage
+        nextCursor = dynamicFieldResponse.nextCursor
+        data.push(...dynamicFieldResponse.data)
+    }
+    return data
+}
+
+// will return invalid profile names only
+export async function validateProfileNames(provider: JsonRpcProvider, names: string[]): Promise<string[]> {
+    const data = await getAllDynamicFields(provider, process.env.PROFILE_INDEX_TABLE as string)
+    const set = new Set(data.map((it) => it.name.value))
+    return names.filter((name) => !set.has(name))
 }

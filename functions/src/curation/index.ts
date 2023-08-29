@@ -1,12 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https'
-import { AddProfileToCurationListInput, CreateCurationListInput, RemoveCurationListInput } from './types'
-import {
-    addProfileToCurationList,
-    createCurationList,
-    removeCurationList,
-    removeProfileFromCurationList,
-    renameCurationList,
-} from './functions'
+import { CreateCurationListInput, RemoveCurationListInput, UpdateCurationListInput } from './types'
+import { createCurationList, removeCurationList, updateCurationList } from './functions'
 import { commonOnRequestSettings, requestParser } from '../utils'
 import express from 'express'
 import { z } from 'zod'
@@ -20,8 +14,8 @@ app.post('/', requestParser({ body: CreateCurationListInput, requireAuth: true }
 app.put(
     '/:curationListId',
     requestParser(
-        { body: CreateCurationListInput, params: z.object({ curationListId: z.string() }), requireAuth: true },
-        renameCurationList,
+        { body: UpdateCurationListInput, params: z.object({ curationListId: z.string() }), requireAuth: true },
+        updateCurationList,
     ),
 )
 app.delete(
@@ -47,25 +41,6 @@ app.get(
 
             return profile.curationList ?? []
         },
-    ),
-)
-
-app.post(
-    '/:curationListId/profile',
-    requestParser(
-        { body: AddProfileToCurationListInput, params: z.object({ curationListId: z.string() }), requireAuth: true },
-        addProfileToCurationList,
-    ),
-)
-app.delete(
-    '/:curationListId/profile/:profileToRemove',
-    requestParser(
-        {
-            body: AddProfileToCurationListInput,
-            params: z.object({ curationListId: z.string(), profileToRemove: z.string() }),
-            requireAuth: true,
-        },
-        removeProfileFromCurationList,
     ),
 )
 
