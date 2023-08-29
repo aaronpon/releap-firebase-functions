@@ -11,7 +11,7 @@ const MIN_VEREAP_MINT_PROFILE_TOKEN = 100_000
 const app = express()
 
 app.post(
-    '/profile/token',
+    '/token',
     requestParser({ body: z.object({ profile: z.string() }), requireAuth: true, signer: true }, async (data) => {
         const {
             ctx: { publicKey },
