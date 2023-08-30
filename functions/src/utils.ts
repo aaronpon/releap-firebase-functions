@@ -10,11 +10,13 @@ import {
     SuiTransactionBlockResponse,
 } from '@mysten/sui.js'
 import { Response, Request } from 'express'
-import { ParseInputError, errorHandler } from './error'
+import { Request as FirebaseRequest } from 'firebase-functions/v2/https'
+import { BadRequest, ParseInputError, errorHandler } from './error'
 import { ZodTypeAny, z } from 'zod'
 import { RequestContext } from './types'
 import { getRequestContext } from './auth'
 import { ServerError } from './error'
+import busboy from 'busboy'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
@@ -158,6 +160,7 @@ export function errorCaptured(handler: (req: Request, res: Response) => Promise<
 }
 
 type Parsed<T extends ZodTypeAny | undefined> = T extends ZodTypeAny ? z.infer<T> : undefined
+type ParsedFiles<T extends true | undefined> = T extends undefined ? undefined : MultipartFile[]
 type CTX<T extends true | 'optional' | undefined> = T extends true
     ? RequestContext
     : T extends 'optional'
@@ -181,14 +184,48 @@ async function parseOrThrow<T extends ZodTypeAny | undefined = undefined>(
     }
 }
 
+function authAndGetRequestContext<T extends true | 'optional' | undefined = undefined>(
+    requireAuth: T | undefined,
+    req: Request,
+): CTX<T> {
+    if (requireAuth != null) {
+        try {
+            return getRequestContext(req) as CTX<T>
+        } catch (err) {
+            if (requireAuth !== 'optional') {
+                throw err
+            }
+            return undefined as CTX<T>
+        }
+    } else {
+        return undefined as CTX<T>
+    }
+}
+
+function createSigner<T extends true | undefined>(
+    signer: T | undefined,
+    ctx: RequestContext | undefined,
+): AdminSigner<T> {
+    if (signer === true) {
+        if (ctx == null) {
+            throw new ServerError('Cannot create signer without ctx')
+        }
+        const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
+        return new RawSigner(keypair, ctx.provider) as AdminSigner<T>
+    } else {
+        return undefined as AdminSigner<T>
+    }
+}
+
 export function requestParser<
     B extends ZodTypeAny | undefined = undefined,
     Q extends ZodTypeAny | undefined = undefined,
     P extends ZodTypeAny | undefined = undefined,
     C extends true | 'optional' | undefined = undefined,
+    F extends true | undefined = undefined,
     S extends true | undefined = undefined,
 >(
-    parser: { body?: B; query?: Q; params?: P; requireAuth?: C; signer?: S },
+    parser: { body?: B; query?: Q; params?: P; requireAuth?: C; signer?: S; parseFiles?: F },
     handler: (payload: {
         req: Request
         body: Parsed<B>
@@ -196,6 +233,7 @@ export function requestParser<
         params: Parsed<P>
         ctx: CTX<C>
         signer: AdminSigner<S>
+        files: ParsedFiles<F>
     }) => Promise<Something>,
 ) {
     return async (req: Request, res: Response): Promise<void> => {
@@ -206,32 +244,18 @@ export function requestParser<
                 parseOrThrow(parser.params, req.params),
             ])
 
-            let ctx
-            let signer
-            if (parser.requireAuth != null) {
-                try {
-                    ctx = getRequestContext(req)
-                } catch (err) {
-                    if (parser.requireAuth !== 'optional') {
-                        throw err
-                    }
-                }
-            }
-            if (parser.signer == true) {
-                if (ctx == null) {
-                    throw new ServerError('Cannot create signer without ctx')
-                }
-                const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
-                signer = new RawSigner(keypair, ctx.provider)
-            }
+            const ctx = authAndGetRequestContext(parser.requireAuth, req)
+            const signer = createSigner(parser.signer, ctx)
+            const files = await parseMultipart<F>(parser.parseFiles, req)
 
             const result = await handler({
                 req,
                 body,
                 query,
                 params,
-                ctx: ctx as CTX<C>,
-                signer: signer as AdminSigner<S>,
+                ctx,
+                signer,
+                files,
             })
             const statusCode = req.method === 'POST' ? 201 : 200
 
@@ -239,6 +263,46 @@ export function requestParser<
         } catch (err) {
             errorHandler(err, res)
         }
+    }
+}
+
+export type MultipartFile = { name: string; filename: string; buffer: Buffer; mimeType: string }
+
+export function parseMultipart<T extends true | undefined>(
+    enabled: T | undefined,
+    req: Request,
+): Promise<ParsedFiles<T>> {
+    if (enabled === true) {
+        return new Promise((resolve, reject) => {
+            const bb = busboy({ headers: req.headers, limits: { fileSize: 15000000 } })
+            const files: MultipartFile[] = []
+            bb.on('file', (name, file, info) => {
+                const buffers: Buffer[] = []
+
+                file.on('limit', () => {
+                    reject(new BadRequest(`File in field "${name}" (${info.filename}) execced size limit`))
+                })
+                    .on('data', (data) => {
+                        buffers.push(data)
+                    })
+                    .on('close', () => {
+                        files.push({
+                            name,
+                            filename: info.filename,
+                            mimeType: info.mimeType,
+                            buffer: Buffer.concat(buffers),
+                        })
+                    })
+            })
+            bb.on('finish', () => resolve(files as ParsedFiles<T>))
+            bb.on('error', (err) => reject(err))
+
+            // Firebase function already parsed and consumed the req stream
+            // Write the body buffer to busboy
+            bb.end((req as FirebaseRequest).rawBody)
+        })
+    } else {
+        return Promise.resolve(undefined as ParsedFiles<T>)
     }
 }
 

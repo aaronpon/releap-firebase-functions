@@ -40,6 +40,7 @@ export { taskCreated } from './task'
 export { governance } from './governance'
 export { curation } from './curation'
 export { profile } from './profile'
+export { bundlr } from './bundlr'
 
 export const entrypoint = onRequest(
     {
