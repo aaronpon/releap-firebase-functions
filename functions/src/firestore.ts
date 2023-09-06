@@ -112,7 +112,7 @@ export async function setProfileOwnerCap(profile: string, profileOwnerCap: strin
     return await storeDoc('profileOwnerCaps', profile, { profileOwnerCap })
 }
 
-export async function addCampaignPoint(campaignProfile: string, minter: string, point: number) {
+export async function addCampaignPoint(campaignProfile: string, minter: string, points: number) {
     const ref = db
         .collection('campaignPoints')
         .where('campaignProfile', '==', campaignProfile)
@@ -122,13 +122,13 @@ export async function addCampaignPoint(campaignProfile: string, minter: string, 
         async (tx) => {
             const doc = (await tx.get(ref)).docs[0]
             if (doc != null) {
-                const data: { campaignProfile: string; minter: string; point: number } = doc.data() as any
-                tx.set(doc.ref, { ...data, point: data.point + point }, { merge: true })
+                const data: { campaignProfile: string; minter: string; points: number } = doc.data() as any
+                tx.set(doc.ref, { ...data, points: data.points + points }, { merge: true })
             } else {
                 const data = {
                     campaignProfile,
                     minter,
-                    point,
+                    points,
                 }
                 tx.set(db.collection('campaignPoints').doc(`${campaignProfile}.${minter}`), data)
             }
@@ -354,12 +354,12 @@ export async function mintBadge(ctx: RequestContext, data: z.infer<typeof FireSt
         badgeId,
         minter,
         campaignProfile: badge.profileId,
-        point: badge.point ?? 0,
+        points: badge.points ?? 0,
         timeStamp,
     })
 
-    if (badge.point != null && badge.point > 0) {
-        await addCampaignPoint(badge.profileId, minter, badge.point)
+    if (badge.points != null && badge.points > 0) {
+        await addCampaignPoint(badge.profileId, minter, badge.points)
     }
     if (badge.discordReward != null) {
         if (profile.discordId != null) {
@@ -385,7 +385,7 @@ export async function createBadgeMint(ctx: RequestContext, data: z.infer<typeof 
         mintList,
         order,
         twitterQuest,
-        point,
+        points,
         suiQuests,
         type,
         manualQuests,
@@ -414,7 +414,7 @@ export async function createBadgeMint(ctx: RequestContext, data: z.infer<typeof 
         profileId,
         mintList: mintList ?? [],
         order: order ?? 0,
-        point: point ?? 0,
+        points: points ?? 0,
         timeStamp,
         twitterQuest,
         suiQuests,
