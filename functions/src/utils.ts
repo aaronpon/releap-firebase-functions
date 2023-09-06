@@ -1,10 +1,36 @@
-import { JsonRpcProvider, PaginatedCoins, PaginatedObjectsResponse, SUI_TYPE_ARG } from '@mysten/sui.js'
+import {
+    Connection,
+    DynamicFieldPage,
+    Ed25519Keypair,
+    JsonRpcProvider,
+    PaginatedCoins,
+    PaginatedObjectsResponse,
+    RawSigner,
+    SUI_TYPE_ARG,
+    SuiTransactionBlockResponse,
+} from '@mysten/sui.js'
+import { Response, Request } from 'express'
+import { Request as FirebaseRequest } from 'firebase-functions/v2/https'
+import { BadRequest, ParseInputError, errorHandler } from './error'
+import { ZodTypeAny, z } from 'zod'
+import { RequestContext } from './types'
+import { getRequestContext } from './auth'
+import { ServerError } from './error'
+import busboy from 'busboy'
 
 export const RPC = process.env.SUI_RPC ?? 'https://mainnet-rpc.releap.xyz:443'
 export const TX_WINDOW = 500
 
 export const GAS_COUNT = parseInt(process.env.GAS_COUNT ?? '20')
 export const GAS_AMOUNT = parseFloat(process.env.GAS_AMOUNT ?? '1')
+
+type Something = NonNullable<object>
+
+export const commonOnRequestSettings = {
+    cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
+    secrets: ['JWT_SECRET'],
+    timeoutSeconds: 180,
+}
 
 export async function getAllOwnedObjects(provider: JsonRpcProvider, address: string) {
     const data: PaginatedObjectsResponse['data'] = []
@@ -110,4 +136,206 @@ export async function retry<T>(
         await sleep(options.retryDelayMs)
     }
     throw new Error('Retry limit exceeded')
+}
+
+export function getProvider() {
+    return new JsonRpcProvider(new Connection({ fullnode: RPC }))
+}
+
+export async function getDynamicFieldByName(address: string, fieldName: string, fieldType = '0x1::string::String') {
+    return await getProvider().getDynamicFieldObject({
+        parentId: address,
+        name: { value: fieldName, type: fieldType },
+    })
+}
+
+export function errorCaptured(handler: (req: Request, res: Response) => Promise<void> | void) {
+    return async (req: Request, res: Response) => {
+        try {
+            await handler(req, res)
+        } catch (error) {
+            errorHandler(error, res)
+        }
+    }
+}
+
+type Parsed<T extends ZodTypeAny | undefined> = T extends ZodTypeAny ? z.infer<T> : undefined
+type ParsedFiles<T extends true | undefined> = T extends undefined ? undefined : MultipartFile[]
+type CTX<T extends true | 'optional' | undefined> = T extends true
+    ? RequestContext
+    : T extends 'optional'
+    ? RequestContext | undefined
+    : undefined
+
+type AdminSigner<S extends true | undefined> = S extends true ? RawSigner : undefined
+
+async function parseOrThrow<T extends ZodTypeAny | undefined = undefined>(
+    parser: T | undefined,
+    data: any,
+): Promise<Parsed<T>> {
+    if (parser != null) {
+        const parsed = await parser.safeParseAsync(data)
+        if (!parsed.success) {
+            throw new ParseInputError(parsed.error)
+        }
+        return parsed.data
+    } else {
+        return undefined as Parsed<T>
+    }
+}
+
+function authAndGetRequestContext<T extends true | 'optional' | undefined = undefined>(
+    requireAuth: T | undefined,
+    req: Request,
+): CTX<T> {
+    if (requireAuth != null) {
+        try {
+            return getRequestContext(req) as CTX<T>
+        } catch (err) {
+            if (requireAuth !== 'optional') {
+                throw err
+            }
+            return undefined as CTX<T>
+        }
+    } else {
+        return undefined as CTX<T>
+    }
+}
+
+function createSigner<T extends true | undefined>(
+    signer: T | undefined,
+    ctx: RequestContext | undefined,
+): AdminSigner<T> {
+    if (signer === true) {
+        if (ctx == null) {
+            throw new ServerError('Cannot create signer without ctx')
+        }
+        const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED_PHRASE as string)
+        return new RawSigner(keypair, ctx.provider) as AdminSigner<T>
+    } else {
+        return undefined as AdminSigner<T>
+    }
+}
+
+export function requestParser<
+    B extends ZodTypeAny | undefined = undefined,
+    Q extends ZodTypeAny | undefined = undefined,
+    P extends ZodTypeAny | undefined = undefined,
+    C extends true | 'optional' | undefined = undefined,
+    F extends true | undefined = undefined,
+    S extends true | undefined = undefined,
+>(
+    parser: { body?: B; query?: Q; params?: P; requireAuth?: C; signer?: S; parseFiles?: F },
+    handler: (payload: {
+        req: Request
+        body: Parsed<B>
+        query: Parsed<Q>
+        params: Parsed<P>
+        ctx: CTX<C>
+        signer: AdminSigner<S>
+        files: ParsedFiles<F>
+    }) => Promise<Something>,
+) {
+    return async (req: Request, res: Response): Promise<void> => {
+        try {
+            const [body, query, params] = await Promise.all([
+                parseOrThrow(parser.body, req.body),
+                parseOrThrow(parser.query, req.query),
+                parseOrThrow(parser.params, req.params),
+            ])
+
+            const ctx = authAndGetRequestContext(parser.requireAuth, req)
+            const signer = createSigner(parser.signer, ctx)
+            const files = await parseMultipart<F>(parser.parseFiles, req)
+
+            const result = await handler({
+                req,
+                body,
+                query,
+                params,
+                ctx,
+                signer,
+                files,
+            })
+            const statusCode = req.method === 'POST' ? 201 : 200
+
+            res.status(statusCode).json(result)
+        } catch (err) {
+            errorHandler(err, res)
+        }
+    }
+}
+
+export type MultipartFile = { name: string; filename: string; buffer: Buffer; mimeType: string }
+
+export function parseMultipart<T extends true | undefined>(
+    enabled: T | undefined,
+    req: Request,
+): Promise<ParsedFiles<T>> {
+    if (enabled === true) {
+        return new Promise((resolve, reject) => {
+            const bb = busboy({ headers: req.headers, limits: { fileSize: 15000000 } })
+            const files: MultipartFile[] = []
+            bb.on('file', (name, file, info) => {
+                const buffers: Buffer[] = []
+
+                file.on('limit', () => {
+                    reject(new BadRequest(`File in field "${name}" (${info.filename}) execced size limit`))
+                })
+                    .on('data', (data) => {
+                        buffers.push(data)
+                    })
+                    .on('close', () => {
+                        files.push({
+                            name,
+                            filename: info.filename,
+                            mimeType: info.mimeType,
+                            buffer: Buffer.concat(buffers),
+                        })
+                    })
+            })
+            bb.on('finish', () => resolve(files as ParsedFiles<T>))
+            bb.on('error', (err) => reject(err))
+
+            // Firebase function already parsed and consumed the req stream
+            // Write the body buffer to busboy
+            bb.end((req as FirebaseRequest).rawBody)
+        })
+    } else {
+        return Promise.resolve(undefined as ParsedFiles<T>)
+    }
+}
+
+export function getCreatedObjectByType(result: SuiTransactionBlockResponse, objectType: RegExp): string | undefined {
+    const object = result.objectChanges?.find((it) => it.type === 'created' && it.objectType.match(objectType))
+    // stupid typescript !
+    if (object?.type === 'created') {
+        return object.objectId
+    } else {
+        return undefined
+    }
+}
+
+export async function getAllDynamicFields(provider: JsonRpcProvider, address: string) {
+    const data: DynamicFieldPage['data'] = []
+    let nextCursor = null
+    let hasNextPage = true
+
+    while (hasNextPage) {
+        const dynamicFieldResponse: DynamicFieldPage = await provider.getDynamicFields({
+            parentId: address,
+            cursor: nextCursor,
+        })
+        hasNextPage = dynamicFieldResponse.hasNextPage
+        nextCursor = dynamicFieldResponse.nextCursor
+        data.push(...dynamicFieldResponse.data)
+    }
+    return data
+}
+
+// will return invalid profile names only
+export async function validateProfileNames(provider: JsonRpcProvider, names: string[]): Promise<string[]> {
+    const data = await getAllDynamicFields(provider, process.env.PROFILE_INDEX_TABLE as string)
+    const set = new Set(data.map((it) => it.name.value))
+    return names.filter((name) => !set.has(name))
 }

@@ -1,34 +1,25 @@
-import { Request } from 'firebase-functions/v2/https'
-import { Response } from 'express'
-import { DiscordServer, RequestContext } from './types'
+import { DiscordServer, RequestContext, VerifyDiscordServer } from './types'
 import { REST } from 'discord.js'
 import { API } from '@discordjs/core'
-import { VerifyDiscordServerInput } from './inputType'
 import { getDoc, storeDoc } from './firestore'
+import { AuthError, BadRequest } from './error'
+import { z } from 'zod'
 
-export async function verifyDiscordServer(ctx: RequestContext, req: Request, res: Response) {
-    const parseResult = await VerifyDiscordServerInput.safeParseAsync(req.body.data)
-
-    if (!parseResult.success) {
-        res.status(400).send(parseResult.error.message).end()
-        return
-    }
-
-    const { profileId, discordServerId, roleId } = parseResult.data
+export async function verifyDiscordServer(ctx: RequestContext, data: z.infer<typeof VerifyDiscordServer>['data']) {
+    const { profileId, discordServerId, roleId } = data
 
     const { profiles } = ctx
     if (!profiles.includes(profileId)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     const serverVerified = await verifiyDiscordServerAccess(discordServerId, profileId)
     const roleVerified = await verifyDiscordServerRole(discordServerId, roleId)
 
     if (serverVerified && roleVerified) {
-        res.status(200).json({ success: true }).end()
+        return { success: true }
     } else {
-        res.status(400).send('Fail to fetch discord server indo').end()
+        throw new BadRequest('Fail to fetch discord server info')
     }
 }
 

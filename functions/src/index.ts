@@ -6,7 +6,6 @@ import admin from 'firebase-admin'
 admin.initializeApp()
 import {
     extendToken,
-    applyJwtValidation,
     requestEthLoginChallenge,
     requestLoginChallenge,
     submitEthLoginChallenge,
@@ -27,17 +26,24 @@ import {
 } from './sponsorTx'
 import { getTwitterScraperProfiles, updateLastScrap as updateLastScrape } from './firestore'
 import { scrapeProfile as scrapeTweets } from './api'
-import { ApifyTwitterRes } from './types'
+import { ApifyTwitterRes, Entrypoint } from './types'
 
 import * as firestore from './firestore'
 import * as oauth from './oauth'
 import * as discord from './discord'
 import { rebalanceGas } from './task'
+import { AuthError } from './error'
+import { commonOnRequestSettings, requestParser } from './utils'
 
 export { taskCreated } from './task'
+export { governance } from './governance'
+export { curation } from './curation'
+export { profile } from './profile'
+export { bundlr } from './bundlr'
 
 export const entrypoint = onRequest(
     {
+        ...commonOnRequestSettings,
         secrets: [
             'JWT_SECRET',
             'TWITTER_COMSUMER_SECRET',
@@ -46,123 +52,89 @@ export const entrypoint = onRequest(
             'DISCORD_CLIENT_SECRET',
             'DISCORD_BOT_TOKEN',
         ],
-        cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
         minInstances: 2,
-        timeoutSeconds: 180,
         memory: '1GiB',
     },
-    async (req, res) => {
-        if (req.method === 'OPTIONS') {
-            res.status(200).end()
-            return
-        }
-
-        logger.info(`Action: ${req.body.action}`, { data: req.body.data })
-        switch (req.body.action) {
-            // JWT login
+    requestParser({ body: Entrypoint, requireAuth: 'optional' }, async (payload) => {
+        const { action, data } = payload.body
+        switch (action) {
+            // JWT login, no auth required
             case 'requestLoginChallenge':
-                requestLoginChallenge(req, res)
-                break
+                return await requestLoginChallenge(data)
             case 'submitLoginChallenge':
-                submitLoginChallenge(req, res)
-                break
+                return await submitLoginChallenge(payload.req, data)
             case 'requestEthLoginChallenge':
-                requestEthLoginChallenge(req, res)
-                break
+                return await requestEthLoginChallenge(data)
             case 'submitEthLoginChallenge':
-                submitEthLoginChallenge(req, res)
-                break
-            case 'extendToken':
-                extendToken(req, res)
-                break
-            // Sponsored tx
-            case 'createProfile':
-                applyJwtValidation(createProfile)(req, res)
-                break
-            case 'createPost':
-                applyJwtValidation(createPost)(req, res)
-                break
-            case 'createComment':
-                applyJwtValidation(createComment)(req, res)
-                break
-            case 'likePost':
-                applyJwtValidation(likePost)(req, res)
-                break
-            case 'unlikePost':
-                applyJwtValidation(unlikePost)(req, res)
-                break
-            case 'followProfile':
-                applyJwtValidation(followProfile)(req, res)
-                break
-            case 'unfollowProfile':
-                applyJwtValidation(unfollowProfile)(req, res)
-                break
-            case 'updateProfileImage':
-                applyJwtValidation(updateProfileImage)(req, res)
-                break
-            case 'updateProfileCover':
-                applyJwtValidation(updateProfileCover)(req, res)
-                break
-            case 'updateProfileDescription':
-                applyJwtValidation(updateProfileDescription)(req, res)
-                break
-            // Firestore
-            case 'fireStoreCreateProfile':
-                applyJwtValidation(firestore.createProfile)(req, res)
-                break
-            case 'fireStoreCreatePost':
-                applyJwtValidation(firestore.createPost)(req, res)
-                break
-            case 'fireStoreCreateComment':
-                applyJwtValidation(firestore.createComment)(req, res)
-                break
-            case 'fireStoreFollowProfile':
-                applyJwtValidation(firestore.followProfile)(req, res)
-                break
-            case 'fireStoreLikePost':
-                applyJwtValidation(firestore.likePost)(req, res)
-                break
-            case 'fireStoreLikeComment':
-                applyJwtValidation(firestore.likeComment)(req, res)
-                break
-            case 'fireStoreMintBadge':
-                applyJwtValidation(firestore.mintBadge)(req, res)
-                break
-            case 'fireStoreCreateBadgeMint':
-                applyJwtValidation(firestore.createBadgeMint)(req, res)
-                break
-            case 'fireStoreupdateLastViewedActivity':
-                applyJwtValidation(firestore.updateLastActivity)(req, res)
-                break
-            case 'badgeMintEligibility':
-                applyJwtValidation(firestore.badgeMintEligibility)(req, res)
-                break
-            // Twitter OAuth
-            case 'requestTwitterOAuthCode':
-                applyJwtValidation(oauth.requestTwitterOAuthCode)(req, res)
-                break
-            case 'connectTwitter':
-                applyJwtValidation(oauth.connectTwitter)(req, res)
-                break
-            case 'connectDiscord':
-                applyJwtValidation(oauth.connectDiscord)(req, res)
-                break
-            case 'disconnectTwitter':
-                applyJwtValidation(oauth.disconnectTwitter)(req, res)
-                break
-            case 'submitQuest':
-                applyJwtValidation(firestore.submitQuest)(req, res)
-                break
-            case 'updateQuestSubmission':
-                applyJwtValidation(firestore.updateQuestSubmission)(req, res)
-                break
-            case 'verifyDiscordServer':
-                discord.verifyDiscordServer({} as any, req, res)
-                break
+                return await submitEthLoginChallenge(payload.req, data)
             default:
-                res.status(400).send('Unexpected action').end()
+                // auth required
+                if (payload.ctx == null) {
+                    throw new AuthError('Login required')
+                }
+                switch (action) {
+                    case 'extendToken':
+                        return await extendToken(payload.ctx)
+                    // Sponsored tx
+                    case 'createProfile':
+                        return await createProfile(payload.ctx, data)
+                    case 'createPost':
+                        return await createPost(payload.ctx, data)
+                    case 'createComment':
+                        return await createComment(payload.ctx, data)
+                    case 'likePost':
+                        return await likePost(payload.ctx, data)
+                    case 'unlikePost':
+                        return await unlikePost(payload.ctx, data)
+                    case 'followProfile':
+                        return await followProfile(payload.ctx, data)
+                    case 'unfollowProfile':
+                        return await unfollowProfile(payload.ctx, data)
+                    case 'updateProfileImage':
+                        return await updateProfileImage(payload.ctx, data)
+                    case 'updateProfileCover':
+                        return await updateProfileCover(payload.ctx, data)
+                    case 'updateProfileDescription':
+                        return await updateProfileDescription(payload.ctx, data)
+                    // Firestore
+                    case 'fireStoreCreateProfile':
+                        return await firestore.createProfile(payload.ctx, data)
+                    case 'fireStoreCreatePost':
+                        return await firestore.createPost(payload.ctx, data)
+                    case 'fireStoreCreateComment':
+                        return await firestore.createComment(payload.ctx, data)
+                    case 'fireStoreFollowProfile':
+                        return await firestore.followProfile(payload.ctx, data)
+                    case 'fireStoreLikePost':
+                        return await firestore.likePost(payload.ctx, data)
+                    case 'fireStoreLikeComment':
+                        return await firestore.likeComment(payload.ctx, data)
+                    case 'fireStoreMintBadge':
+                        return await firestore.mintBadge(payload.ctx, data)
+                    case 'fireStoreCreateBadgeMint':
+                        return await firestore.createBadgeMint(payload.ctx, data)
+                    case 'fireStoreupdateLastViewedActivity':
+                        return await firestore.updateLastActivity(payload.ctx, data)
+                    case 'badgeMintEligibility':
+                        return await firestore.badgeMintEligibility(payload.ctx, data)
+                    // Twitter OAuth
+                    case 'requestTwitterOAuthCode':
+                        return await oauth.requestTwitterOAuthCode(payload.ctx, data)
+                    case 'connectTwitter':
+                        return await oauth.connectTwitter(payload.ctx, data)
+                    case 'connectDiscord':
+                        return await oauth.connectDiscord(payload.ctx, data)
+                    case 'disconnectTwitter':
+                        return await oauth.disconnectTwitter(payload.ctx, data)
+                    case 'submitQuest':
+                        return await firestore.submitQuest(payload.ctx, data)
+                    case 'updateQuestSubmission':
+                        return await firestore.updateQuestSubmission(payload.ctx, data)
+                    case 'verifyDiscordServer':
+                        return await discord.verifyDiscordServer(payload.ctx, data)
+                }
         }
-    },
+    }),
 )
 
 export const twitterPostingV2 = onSchedule(

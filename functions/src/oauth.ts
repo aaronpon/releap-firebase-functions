@@ -1,11 +1,11 @@
 import OAuth from 'oauth-1.0a'
-import { Request } from 'firebase-functions/v2/https'
-import { Response } from 'express'
 import { createHmac } from 'crypto'
 import axios from 'axios'
 import * as logger from 'firebase-functions/logger'
 import { updateUserDiscordData, updateUserTwitterData } from './firestore'
-import { RequestContext } from './types'
+import { ConnectDiscord, ConnectTwitter, DisconnectTwitter, RequestContext, RequestTwitterOAuthCode } from './types'
+import { AuthError } from './error'
+import { z } from 'zod'
 
 async function requestTwitterAccessToken({ oauthToken, oauthVerifier }: { oauthToken: string; oauthVerifier: string }) {
     const twitterOauth: OAuth = new OAuth({
@@ -52,7 +52,10 @@ async function requestTwitterAccessToken({ oauthToken, oauthVerifier }: { oauthT
     }
 }
 
-export async function requestTwitterOAuthCode(ctx: RequestContext, req: Request, res: Response) {
+export async function requestTwitterOAuthCode(
+    ctx: RequestContext,
+    data: z.infer<typeof RequestTwitterOAuthCode>['data'],
+) {
     const twitterOauth: OAuth = new OAuth({
         consumer: {
             key: process.env.TWITTER_COMSUMER_KEY as string,
@@ -63,7 +66,7 @@ export async function requestTwitterOAuthCode(ctx: RequestContext, req: Request,
             return createHmac('sha1', key).update(data).digest('base64')
         },
     })
-    const { redirectUrl } = req.body.data
+    const { redirectUrl } = data
     const config = {
         url: `https://api.twitter.com/oauth/request_token`,
         method: 'POST',
@@ -94,22 +97,21 @@ export async function requestTwitterOAuthCode(ctx: RequestContext, req: Request,
             throw new Error('unexpected twitter request_token response')
         }
 
-        res.status(200).json({
+        return {
             oauthToken: map['oauth_token'] as string,
             oauthTokenSecret: map['oauth_token_secret'] as string,
             oauthCallbackConfirmed: map['oauth_callback_confirmed'] as string,
-        })
+        }
     } catch (err) {
         logger.error(err)
         throw err
     }
 }
 
-export async function connectTwitter(ctx: RequestContext, req: Request, res: Response) {
-    const { profile, oauthToken, oauthVerifier } = req.body.data
+export async function connectTwitter(ctx: RequestContext, data: z.infer<typeof ConnectTwitter>['data']) {
+    const { profile, oauthToken, oauthVerifier } = data
     if (!ctx.profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
 
     logger.info({ oauthToken, oauthVerifier })
@@ -120,17 +122,16 @@ export async function connectTwitter(ctx: RequestContext, req: Request, res: Res
     })
 
     await updateUserTwitterData(profile, user_id, screen_name)
-    res.status(200).json({ success: true })
+    return { success: true }
 }
 
-export async function disconnectTwitter(ctx: RequestContext, req: Request, res: Response) {
-    const { profile } = req.body.data
+export async function disconnectTwitter(ctx: RequestContext, data: z.infer<typeof DisconnectTwitter>['data']) {
+    const { profile } = data
     if (!ctx.profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
     await updateUserTwitterData(profile, null, null)
-    res.status(200).json({ success: true })
+    return { success: true }
 }
 
 interface DiscordAuthResponse {
@@ -147,11 +148,10 @@ interface DiscordProfileResponse {
     discriminator: string
 }
 
-export async function connectDiscord(ctx: RequestContext, req: Request, res: Response) {
-    const { code, redirectUri, profile } = req.body.data
+export async function connectDiscord(ctx: RequestContext, data: z.infer<typeof ConnectDiscord>['data']) {
+    const { code, redirectUri, profile } = data
     if (!ctx.profiles.includes(profile)) {
-        res.status(401).send("You don't own this profile").end()
-        return
+        throw new AuthError("You don't own this profile")
     }
     try {
         const data = new URLSearchParams()
@@ -172,9 +172,8 @@ export async function connectDiscord(ctx: RequestContext, req: Request, res: Res
 
         await updateUserDiscordData(profile, id, `${username}#${discriminator}`)
 
-        res.status(200).json({ success: true })
+        return { success: true }
     } catch (err) {
-        res.status(400).json({ success: false })
         logger.error(err)
         throw new Error(`Fail to connect discord, profile address ${profile}`)
     }
