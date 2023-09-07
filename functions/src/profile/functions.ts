@@ -119,6 +119,7 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
         })
 
         profile.profileTokenType = coinType as string
+        profile.profileTokenTreasuryCap = treasuryCap as string
 
         return profile
     } catch (err) {

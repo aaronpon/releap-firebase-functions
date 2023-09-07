@@ -92,6 +92,7 @@ export const Profile = z.object({
     activeWallet: z.string().optional().nullable(),
     curationList: CurationList.optional().nullable(),
     profileTokenType: z.string().optional().nullable(),
+    profileTokenTreasuryCap: z.string().optional().nullable(),
 })
 
 export type IProfile = z.infer<typeof Profile>
