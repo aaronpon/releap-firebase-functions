@@ -27,7 +27,21 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
         description: `Releap Profile Token: ${profile.name}`,
     })
 
-    const gas = await retry(
+    const gas1 = await retry(
+        async () => {
+            const gas = await borrowGas()
+            if (gas == null) {
+                throw new Error('Server busy, no gas coin avaliable')
+            }
+            return gas
+        },
+        {
+            retryCount: 50,
+            retryDelayMs: 500,
+        },
+    )
+
+    const gas2 = await retry(
         async () => {
             const gas = await borrowGas()
             if (gas == null) {
@@ -44,7 +58,7 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
     try {
         const deployTokenTx = new TransactionBlock()
 
-        deployTokenTx.setGasPayment([gas])
+        deployTokenTx.setGasPayment([gas1])
 
         const [upgradeCap] = deployTokenTx.publish({
             modules: modules.map((it) => Array.from(fromB64(it))),
@@ -74,7 +88,7 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
 
         const deployPoolTx = new TransactionBlock()
 
-        deployPoolTx.setGasPayment([gas])
+        deployPoolTx.setGasPayment([gas2])
 
         const [mintedProfileToken] = deployPoolTx.moveCall({
             target: `${_package}::${_module}::mint_only`,
@@ -124,7 +138,8 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
     } catch (err) {
         logger.error(err)
         throw err
-        await returnGas(gas)
+        await returnGas(gas1)
+        await returnGas(gas2)
     }
 }
 
