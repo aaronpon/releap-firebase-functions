@@ -139,6 +139,7 @@ export async function createProfileToken(profile: IProfile, options: { signer: R
     } catch (err) {
         logger.error(err)
         throw err
+    } finally {
         await returnGas(gas1)
         await returnGas(gas2)
     }
