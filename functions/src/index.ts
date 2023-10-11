@@ -152,7 +152,9 @@ export const twitterPostingV2 = onSchedule(
 
                 const index = Math.floor(Math.random() * 99)
 
-                const tweet: ApifyTwitterRes = (await scrapeTweets(profile.twitter))[index]
+                const activeAccount = Math.floor(Math.random() * 4)
+
+                const tweet: ApifyTwitterRes = (await scrapeTweets(profile.twitter, activeAccount))[index]
 
                 await updateLastScrape(profile.name, new Date().toISOString())
 
