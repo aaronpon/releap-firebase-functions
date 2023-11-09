@@ -16,7 +16,7 @@ app.post(
         const balance = await bundlr.getBalance(bundlr.address as string)
 
         // auto topup
-        if (balance < price) {
+        if (balance.lt(price)) {
             const value = bundlr.utils.toAtomic(1)
             await bundlr.fund(value)
         }
