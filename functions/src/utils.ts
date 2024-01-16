@@ -27,7 +27,7 @@ export const GAS_AMOUNT = parseFloat(process.env.GAS_AMOUNT ?? '1')
 type Something = NonNullable<object>
 
 export const commonOnRequestSettings = {
-    cors: [/localhost/, /.*\.releap\.xyz$/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
+    cors: [/localhost/, /.*\.releap\.xyz$/, /.*\.releap\.io/, /localhost:3000/, /.*\.d1doiqjkpgeoca\.amplifyapp\.com/],
     secrets: ['JWT_SECRET'],
     timeoutSeconds: 180,
 }
