@@ -1,5 +1,6 @@
 import { ApifyClient } from 'apify-client'
 import { ApifyTwitterRes } from './types'
+import axios from 'axios'
 
 // Initialize the ApifyClient with API token
 const apikeys = [
@@ -25,17 +26,25 @@ export const scrapeProfile = async (twitterProfileName: string, activeAccount: n
 
     console.log('USING API KEY: ', apikeys[activeAccount].token)
 
-    const run = await task.call({
-        addUserInfo: false,
-        profileMode: 'replies',
-        tweetsDesired: 100,
-        proxyConfig: {
-            useApifyProxy: true,
-        },
-        handles: [twitterProfileName],
-    })
+    try {
+        const run = await task.call({
+            addUserInfo: false,
+            profileMode: 'replies',
+            tweetsDesired: 100,
+            proxyConfig: {
+                useApifyProxy: true,
+            },
+            handles: [twitterProfileName],
+        })
 
-    const { items }: any = await client.dataset(run.defaultDatasetId).listItems()
+        const { items }: any = await client.dataset(run.defaultDatasetId).listItems()
 
-    return items
+        return items
+    } catch (e) {
+        const { data } = await axios.get(
+            `https://releap-social-bucket.s3.us-west-2.amazonaws.com/${twitterProfileName}.json`,
+        )
+        console.log(e)
+        return data
+    }
 }
