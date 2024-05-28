@@ -139,7 +139,7 @@ export const entrypoint = onRequest(
 
 export const twitterPostingV2 = onSchedule(
     {
-        schedule: 'every 8 minutes',
+        schedule: 'every 40 minutes',
         timeoutSeconds: 180,
     },
     async () => {

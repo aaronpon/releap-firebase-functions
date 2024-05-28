@@ -28,7 +28,6 @@ import {
 } from './types'
 
 import { CollectionReference, DocumentData, Query, Timestamp } from 'firebase-admin/firestore'
-import { checkManualQuest, checkQuestEligibility, checkSuiQuest, checkTwitterQuest } from './quest'
 import { assignRole } from './discord'
 import { AuthError, BadRequest, NotFoundError, ServerError } from './error'
 import { z } from 'zod'
@@ -435,8 +434,8 @@ export async function createBadgeMint(ctx: RequestContext, data: z.infer<typeof 
 }
 
 export async function badgeMintEligibility(ctx: RequestContext, data: z.infer<typeof BadgeMintEligibility>['data']) {
-    const { badgeId, profileId } = data
-    const { profiles, publicKey, provider } = ctx
+    const { profileId } = data
+    const { profiles } = ctx
     if (!profiles.includes(profileId)) {
         throw new AuthError("You don't own this profile")
     }
@@ -447,13 +446,13 @@ export async function badgeMintEligibility(ctx: RequestContext, data: z.infer<ty
         throw new NotFoundError('Profile not found')
     }
 
-    const { twitterQuest, suiQuests, manualQuests } = (await getDoc<ICampaign>('badgeId', badgeId)) ?? {}
+    // const { twitterQuest, suiQuests, manualQuests } = (await getDoc<ICampaign>('badgeId', badgeId)) ?? {}
 
-    const manualQuestsCompleted = await checkManualQuest(db, profile, manualQuests)
-    const suiQuestCompleted = await checkSuiQuest(provider, publicKey, suiQuests)
-    const twitterQuestCompleted = await checkTwitterQuest(db, profile, badgeId, twitterQuest)
+    const manualQuestsCompleted = true
+    const suiQuestCompleted = true
+    const twitterQuestCompleted = true
 
-    const eligible = checkQuestEligibility(manualQuestsCompleted, suiQuestCompleted, twitterQuestCompleted)
+    const eligible = true
 
     return {
         eligible,
